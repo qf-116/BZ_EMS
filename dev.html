@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>东浩智创 设备管理系统标准版</title>
+    <!--file-redirect-start-->
+    <script>
+      // 直接双击打开（file:// 协议）时，跳转到构建好的单文件版本 dist/index.html；
+      // 通过 npm run dev 访问时为 http 协议，正常走 Vite 源码入口，不受影响。
+      // 构建时该脚本会被剥离（见 vite.config.js），避免 dist 自我跳转。
+      if (location.protocol === 'file:') {
+        location.replace('./dist/index.html');
+      }
+    </script>
+    <!--file-redirect-end-->
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>

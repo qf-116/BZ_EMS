@@ -1,0 +1,261 @@
+// ============================================================
+// 动作层（§5.1 / §5.2 / §9 跨模块动作矩阵）
+// 职责：入参预校验 → 构造符合 §5.1 结构的 action → dispatch；
+//       返回 { ok, message, refs } 作为用户反馈（toast 只作辅助，状态变化以 reducer 为准）。
+// 幂等键按设计约束构造，重复请求由 reducer 命中登记后返回同一结果。
+// ============================================================
+
+import { canAlarmTransition } from '../domain/alarm.js';
+import { canRepairTransition } from '../domain/repair.js';
+import { validateOutbound, validateReturn } from '../domain/spare.js';
+
+let actionSeq = 0;
+const nextActionId = () => `demo-action-20260916-${String(++actionSeq).padStart(4, '0')}`;
+
+export function createDemoActions(state, dispatch) {
+  const E = state.entities;
+  const actor = state.meta.actorContext || { userId: 'demo-user', userName: '演示用户', source: 'host-context' };
+
+  const act = (type, payload, idempotencyKey) => {
+    dispatch({ type, payload, actorContext: actor, actionId: nextActionId(), idempotencyKey, at: undefined });
+  };
+  const fail = (message) => ({ ok: false, message, refs: {} });
+
+  return {
+    // ---------- 绑定 ----------
+    saveBinding(deviceId, summary) {
+      const draft = (state.ui.bindingDraftsByDeviceId || {})[`draft-${deviceId}`];
+      if (!draft) return fail('没有待保存的绑定草稿');
+      const current = E.bindingsByDeviceId[deviceId];
+      const version = (current?.version || 0) + 1;
+      act('binding/save', { deviceId, summary }, `binding:${deviceId}:v${version}`);
+      return { ok: true, message: `绑定 v${version} 已保存，状态「待生效」；启用后生效`, refs: { deviceId, version } };
+    },
+    enableBinding(deviceId) {
+      const b = E.bindingsByDeviceId[deviceId];
+      if (!b) return fail('该设备尚未创建绑定');
+      if (!['待生效', '换绑中'].includes(b.configStatus)) return fail(`当前状态「${b.configStatus}」不能启用`);
+      act('binding/enable', { deviceId }, `binding-enable:${deviceId}:v${b.version}`);
+      return { ok: true, message: `绑定 v${b.version} 已启用，影响监测/报警/OEE/报表/大屏`, refs: { deviceId, bindingId: b.bindingId } };
+    },
+    disableBinding(deviceId, opts = {}) {
+      const b = E.bindingsByDeviceId[deviceId];
+      if (!b) return fail('该设备尚未创建绑定');
+      if (b.configStatus !== '已启用') return fail(`当前状态「${b.configStatus}」不能停用`);
+      act('binding/disable', { deviceId, reason: opts?.reason || '' }, `binding-disable:${deviceId}:v${b.version}`);
+      return { ok: true, message: `绑定 v${b.version} 已停用`, refs: { deviceId } };
+    },
+    addBindingSource(deviceId, source) {
+      act('binding/addSource', { deviceId, source });
+      return { ok: true, message: `已将 ${source.iotDeviceCode} 加入绑定草稿（未保存）`, refs: { deviceId } };
+    },
+    removeBindingSource(deviceId, iotDeviceId) {
+      act('binding/removeSource', { deviceId, iotDeviceId });
+      return { ok: true, message: '已从绑定草稿移除（未保存）', refs: { deviceId } };
+    },
+    toggleBindingMetric(deviceId, iotDeviceId, metricCode) {
+      act('binding/toggleMetric', { deviceId, iotDeviceId, metricCode });
+      return { ok: true, message: '指标选择已切换（未保存）', refs: { deviceId } };
+    },
+
+    // ---------- 实时 ----------
+    refreshRealtime() {
+      act('realtime/refresh', {});
+      return { ok: true, message: '演示轮询完成', refs: {} };
+    },
+    setProviderMode(mode) {
+      act('realtime/setProviderMode', { mode });
+      const label = { 'mock-polling': '演示轮询', 'mock-subscription': '演示订阅', disconnect: '断开（降级）' }[mode];
+      return { ok: true, message: `已切换为${label}`, refs: {} };
+    },
+
+    // ---------- 报警 ----------
+    ackAlarm(alarmId, { note }) {
+      const alarm = E.alarmEventsById[alarmId];
+      if (!alarm) return fail('报警事件不存在');
+      if (!(note || '').trim()) return fail('确认必须填写说明');
+      if (!canAlarmTransition(alarm.status, '已确认')) return fail(`当前状态「${alarm.status}」不能确认`);
+      act('alarm/ack', { alarmId, note }, `ack:${alarmId}:v1`);
+      return { ok: true, message: `已确认 ${alarm.id}，下一步：处置（填写措施与预计完成时间）`, refs: { alarmId } };
+    },
+    handleAlarm(alarmId, { measure, expectedAt }) {
+      const alarm = E.alarmEventsById[alarmId];
+      if (!alarm) return fail('报警事件不存在');
+      if (!(measure || '').trim()) return fail('处置必须填写措施');
+      if (!expectedAt) return fail('处置必须填写预计完成时间');
+      if (alarm.status === '已关闭') return fail('已关闭报警不能处置');
+      act('alarm/handle', { alarmId, measure, expectedAt }, `handle:${alarmId}:v1`);
+      return { ok: true, message: '处置已记录；如需维修请使用「转维修申请」', refs: { alarmId } };
+    },
+    createRepairFromAlarm(alarmId, extra = {}) {
+      const alarm = E.alarmEventsById[alarmId];
+      if (!alarm) return fail('报警事件不存在');
+      const existing = Object.values(E.repairOrdersById).find(o => o.alarmId === alarmId && !['已完成', '已取消'].includes(o.status));
+      if (existing) {
+        return { ok: true, idempotent: true, message: `该报警已存在活动工单 ${existing.repairOrderId}，不重复建单`, refs: { repairOrderId: existing.repairOrderId } };
+      }
+      if (alarm.status === '已关闭') return fail('已关闭报警不能转维修；如需维修请人工报修');
+      act('alarm/createRepairFromAlarm', { alarmId, ...extra }, `repair-from-alarm:${alarmId}`);
+      return { ok: true, message: '已生成唯一主工单并回写至报警；请到「维修任务」派工', refs: { alarmId } };
+    },
+    closeAlarm(alarmId, { evidence, closeReason }) {
+      const alarm = E.alarmEventsById[alarmId];
+      if (!alarm) return fail('报警事件不存在');
+      if (alarm.status !== '已恢复待关闭') return fail(`当前状态「${alarm.status}」，只有「已恢复待关闭」可关闭`);
+      if (!(evidence || '').trim() || !(closeReason || '').trim()) return fail('关闭必须填写恢复证据和原因');
+      act('alarm/close', { alarmId, evidence, closeReason }, `close:${alarmId}:v1`);
+      return { ok: true, message: `已关闭 ${alarm.id}`, refs: { alarmId } };
+    },
+
+    // ---------- 维修 ----------
+    createRepairReport(payload) {
+      const { deviceId, faultDesc, level, faultType, title } = payload;
+      const device = E.devicesById[deviceId];
+      if (!device) return fail('设备不存在');
+      if (!(faultDesc || '').trim()) return fail('故障描述必填');
+      act('repair/createReport', { deviceId, faultDesc, level, faultType, title });
+      return { ok: true, message: '报修已提交，生成待派工主工单', refs: { deviceId } };
+    },
+    assignRepair(repairOrderId, { assignee, assigneeGroup }) {
+      const order = E.repairOrdersById[repairOrderId];
+      if (!order) return fail('维修工单不存在');
+      if (!canRepairTransition(order.status, '已派工')) return fail(`当前状态「${order.status}」不能派工`);
+      if (!(assignee || '').trim()) return fail('派工必须指定维修人');
+      act('repair/assign', { repairOrderId, assignee, assigneeGroup }, `assign:${repairOrderId}:v${(order.reworkCount || 0) + 1}`);
+      return { ok: true, message: `已派工至 ${assignee}`, refs: { repairOrderId } };
+    },
+    startRepair(repairOrderId) {
+      const order = E.repairOrdersById[repairOrderId];
+      if (!order) return fail('维修工单不存在');
+      if (!canRepairTransition(order.status, '维修中')) return fail(`当前状态「${order.status}」不能开工`);
+      act('repair/start', { repairOrderId }, `start:${repairOrderId}:v${(order.reworkCount || 0) + 1}`);
+      return { ok: true, message: '已开工；生成维修停机事实并联动 OEE', refs: { repairOrderId } };
+    },
+    pauseRepair(repairOrderId, reason) {
+      const order = E.repairOrdersById[repairOrderId];
+      if (!order || order.status !== '维修中') return fail('仅「维修中」工单可挂起');
+      act('repair/pause', { repairOrderId, reason }, `pause:${repairOrderId}:v${(order.reworkCount || 0) + 1}`);
+      return { ok: true, message: '工单已挂起', refs: { repairOrderId } };
+    },
+    resumeRepair(repairOrderId) {
+      const order = E.repairOrdersById[repairOrderId];
+      if (!order || order.status !== '挂起') return fail('仅「挂起」工单可恢复');
+      act('repair/resume', { repairOrderId }, `resume:${repairOrderId}:v${(order.reworkCount || 0) + 1}`);
+      return { ok: true, message: '工单已恢复维修', refs: { repairOrderId } };
+    },
+    submitRepair(repairOrderId, { measures, verification, laborHours }) {
+      const order = E.repairOrdersById[repairOrderId];
+      if (!order) return fail('维修工单不存在');
+      if (!canRepairTransition(order.status, '待验收')) return fail(`当前状态「${order.status}」不能提交验收`);
+      if (!(measures || '').trim() || !(verification || '').trim()) return fail('必须填写维修措施与验证方式');
+      act('repair/submit', { repairOrderId, measures, verification, laborHours }, `submit-repair:${repairOrderId}:v${order.reworkCount || 0}`);
+      return { ok: true, message: '已提交，进入「待验收」；验收通过后设备才恢复', refs: { repairOrderId } };
+    },
+    acceptRepair(repairOrderId, { result = '通过', opinion }) {
+      const order = E.repairOrdersById[repairOrderId];
+      if (!order) return fail('维修工单不存在');
+      if (order.status !== '待验收') return fail(`当前状态「${order.status}」不能验收`);
+      act('repair/accept', { repairOrderId, result, opinion }, `accept:${repairOrderId}:v${order.reworkCount || 0}`);
+      return {
+        ok: true,
+        message: result === '返修'
+          ? '已退回返修（原履历保留），状态回到「维修中」'
+          : '验收通过：设备恢复、关联停机结束、报警进入恢复流程',
+        refs: { repairOrderId },
+      };
+    },
+
+    // ---------- 备件 ----------
+    consumeSpare({ repairOrderId, spareCode, warehouseId, qty, requestId }) {
+      const order = E.repairOrdersById[repairOrderId];
+      if (!order) return fail('维修工单不存在');
+      if (!['已派工', '维修中'].includes(order.status)) return fail(`工单状态「${order.status}」不允许领料出库`);
+      const stockRow = E.stockByKey[`${warehouseId}|${spareCode}`];
+      const check = validateOutbound(stockRow, qty);
+      if (!check.ok) return fail(check.error);
+      const key = `outbound:${repairOrderId}:${spareCode}:${requestId}`;
+      if (E.idempotencyByKey[key]) {
+        return { ok: true, idempotent: true, message: `重复提交已忽略（幂等）：${E.idempotencyByKey[key].message}`, refs: E.idempotencyByKey[key].refs || {} };
+      }
+      act('spare/consume', { repairOrderId, spareCode, warehouseId, qty, requestId }, key);
+      return { ok: true, message: `出库成功：${warehouseId} 可用库存 −${qty}，已生成维修出库单`, refs: { repairOrderId, spareCode } };
+    },
+    returnSpare({ outboundId, qty, reason, requestId }) {
+      const outbound = E.outboundsById[outboundId];
+      if (!outbound) return fail('出库单不存在');
+      const item = outbound.items[0];
+      const returned = Object.values(E.returnsById).filter(r => r.outboundId === outboundId).reduce((s, r) => s + r.qty, 0);
+      const check = validateReturn(item.qty, returned, qty);
+      if (!check.ok) return fail(check.error);
+      const key = `return:${outboundId}:${requestId}`;
+      if (E.idempotencyByKey[key]) {
+        return { ok: true, idempotent: true, message: `重复提交已忽略（幂等）`, refs: {} };
+      }
+      act('spare/return', { outboundId, qty, reason, requestId }, key);
+      return { ok: true, message: `退库成功：${item.spareName} ×${qty} 已回冲 ${outbound.warehouseId}`, refs: { outboundId } };
+    },
+    inboundSpare({ spareCode, warehouseId, qty, requestId, supplier, batch, handler }) {
+      if (!(qty > 0)) return fail('入库数量必须为正数');
+      act('spare/inbound', { spareCode, warehouseId, qty, requestId, supplier, batch, handler }, `inbound:${warehouseId}:${spareCode}:${requestId}`);
+      return { ok: true, message: '入库成功', refs: { spareCode } };
+    },
+
+    // ---------- 停机 ----------
+    saveDowntime(fact) {
+      act('downtime/save', { fact }, `downtime:${fact.deviceId}:${fact.start}:${fact.category}`);
+      return {
+        ok: true,
+        message: ['计划停机', '换模'].includes(fact.category)
+          ? '停机事实已保存；计划停机按口径影响可用率，已触发 OEE 重算'
+          : '停机事实已保存',
+        refs: { deviceId: fact.deviceId },
+      };
+    },
+    deleteDowntime(downtimeId, reason) {
+      const fact = E.downtimeFactsById[downtimeId];
+      if (!fact) return fail('停机事实不存在');
+      act('downtime/delete', { downtimeId, reason }, `downtime-del:${downtimeId}:v1`);
+      return { ok: true, message: fact.status === '待执行' ? '待执行停机已删除' : '停机已取消留痕并触发 OEE 重算', refs: { downtimeId } };
+    },
+
+    // ---------- OEE ----------
+    saveSpeedConfig(configId, idealSpeed) {
+      const cfg = E.speedConfigsById[configId];
+      if (!cfg) return fail('速度配置不存在');
+      if (!(idealSpeed > 0)) return fail('理想速度必须为正数');
+      act('oee/saveSpeed', { configId, idealSpeed }, `speed:${configId}:v${(cfg.version || 1) + 1}`);
+      return { ok: true, message: `速度配置已保存（v${(cfg.version || 1) + 1}），已触发演示重算`, refs: { configId } };
+    },
+    saveOeeConfig(deviceId, target) {
+      if (!(target > 0 && target <= 100)) return fail('OEE 目标必须为 0 ~ 100');
+      act('oee/saveConfig', { deviceId, target }, `oee-target:${deviceId}:v${(E.oeeTargetsByDeviceId[deviceId]?.version || 0) + 1}`);
+      return { ok: true, message: `OEE 目标已保存：${target}%`, refs: { deviceId } };
+    },
+    recomputeOee(deviceId, range, reason) {
+      const revision = Object.keys(E.oeeRecomputeLogById).length + 1;
+      act('oee/recompute', { deviceId, range, reason }, `oee:${deviceId}:${range}:r${revision}`);
+      return { ok: true, message: 'OEE 重算完成：结果按当前停机事实与配置重新推导', refs: { deviceId } };
+    },
+
+    // ---------- 报表 ----------
+    runReport(theme, filters) {
+      act('report/run', { theme, filters });
+      return { ok: true, message: '查询完成', refs: { theme } };
+    },
+    createExportTask(theme, filters) {
+      act('report/createExport', { theme, filters });
+      return { ok: true, message: '演示导出任务已创建', refs: { theme } };
+    },
+
+    // ---------- 大屏 / 重置 ----------
+    setScreenPage(page) {
+      act('screen/setPage', { page });
+      return { ok: true, message: `大屏切换到 ${page}`, refs: {} };
+    },
+  };
+}
+
+// resetDemo 不走 reducer：由 DemoStore 直接以初始快照替换状态（§4.2）
+export function resetDemoAction() {
+  return { type: 'demo/reset', actionId: nextActionId() };
+}
