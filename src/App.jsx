@@ -102,6 +102,24 @@ const menus = [
     // 预留：采购申请 / 到货验收 / 安装调试 / 设备变更 / 报废处置（另行确认后交付）
     // V2.1：设备联网配置移入「数据接入 · 联网配置总览」，设备台账列表提供「联网配置」入口
   ] },
+  { key: 'inspection', icon: <ClipboardList size={15} />, label: '点检管理', children: [
+    { key: '/inspection-items', icon: <ClipboardList size={14} />, label: '点检项目' },
+    { key: '/inspection-standards', icon: <ClipboardList size={14} />, label: '点检标准' },
+    { key: '/inspection-plans', icon: <ClipboardList size={14} />, label: '点检计划' },
+    { key: '/inspection-tasks', icon: <ClipboardList size={14} />, label: '点检任务' },
+  ] },
+  { key: 'maintenance', icon: <Truck size={15} />, label: '保养管理', children: [
+    { key: '/maintenance-items', icon: <Truck size={14} />, label: '保养项目' },
+    { key: '/maintenance-standards', icon: <Truck size={14} />, label: '保养标准' },
+    { key: '/maintenance-plans', icon: <Truck size={14} />, label: '保养计划' },
+    { key: '/maintenance-tasks', icon: <Truck size={14} />, label: '保养任务' },
+  ] },
+  { key: 'patrol', icon: <Activity size={15} />, label: '巡检管理', children: [
+    { key: '/patrol-items', icon: <Activity size={14} />, label: '巡检项目' },
+    { key: '/patrol-standards', icon: <Activity size={14} />, label: '巡检标准' },
+    { key: '/patrol-plans', icon: <Activity size={14} />, label: '巡检计划' },
+    { key: '/patrol-tasks', icon: <Activity size={14} />, label: '巡检任务' },
+  ] },
   { key: 'repair', icon: <Wrench size={15} />, label: '维修管理', children: [
     { key: '/repair-pending', icon: <Wrench size={14} />, label: '待维修' },
     { key: '/repair-reports', icon: <Wrench size={14} />, label: '故障报修' },
@@ -130,24 +148,6 @@ const menus = [
     { key: '/oee-speed-config', icon: <Settings2 size={14} />, label: '理想生产速度配置' },
     { key: '/planned-downtime', icon: <CalendarClock size={14} />, label: '计划停机时间管理' },
     { key: '/screen/device', icon: <Activity size={14} />, label: '监测大屏' },
-  ] },
-  { key: 'inspection', icon: <ClipboardList size={15} />, label: '点检管理', children: [
-    { key: '/inspection-items', icon: <ClipboardList size={14} />, label: '点检项目' },
-    { key: '/inspection-standards', icon: <ClipboardList size={14} />, label: '点检标准' },
-    { key: '/inspection-plans', icon: <ClipboardList size={14} />, label: '点检计划' },
-    { key: '/inspection-tasks', icon: <ClipboardList size={14} />, label: '点检任务' },
-  ] },
-  { key: 'maintenance', icon: <Truck size={15} />, label: '保养管理', children: [
-    { key: '/maintenance-items', icon: <Truck size={14} />, label: '保养项目' },
-    { key: '/maintenance-standards', icon: <Truck size={14} />, label: '保养标准' },
-    { key: '/maintenance-plans', icon: <Truck size={14} />, label: '保养计划' },
-    { key: '/maintenance-tasks', icon: <Truck size={14} />, label: '保养任务' },
-  ] },
-  { key: 'patrol', icon: <Activity size={15} />, label: '巡检管理', children: [
-    { key: '/patrol-items', icon: <Activity size={14} />, label: '巡检项目' },
-    { key: '/patrol-standards', icon: <Activity size={14} />, label: '巡检标准' },
-    { key: '/patrol-plans', icon: <Activity size={14} />, label: '巡检计划' },
-    { key: '/patrol-tasks', icon: <Activity size={14} />, label: '巡检任务' },
   ] },
   { key: 'alarm', icon: <AlarmClock size={15} />, label: '报警中心', children: [
     { key: '/alarm-center', icon: <AlarmClock size={14} />, label: '报警中心' },
