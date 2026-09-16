@@ -890,7 +890,7 @@ const specs = {
     content: (
       <>
         <h4>页面目标</h4>
-        <p>param 路由 <code>/device-ledger/detail/:deviceId</code>（兼容 <code>/device-ledger/detail?deviceId=</code> query 形式）：单台设备的档案视图——资产信息、编码映射、绑定与版本历史、接入状态与业务履历。</p>
+        <p>param 路由 <code>/device-ledger/detail/:deviceId</code>（兼容 <code>/device-ledger/detail?deviceId=</code> query 形式）：单台设备的档案视图——资产信息、编码映射、绑定与版本历史、接入状态、业务履历，以及关联业务记录（点检 / 保养 / 巡检 / 报修与维修工单 / 报警 Tab 页）。</p>
         <h4>数据来源与刷新</h4>
         <ol>
           <li>档案来自 <code>selectDevice(state, deviceId)</code>；编码映射来自 <code>selectDeviceCrosswalk</code>；绑定与版本历史来自 <code>selectBinding / selectBindingVersions</code>；接入任务来自 <code>selectIngestionTasks(deviceId)</code>；履历来自 <code>selectBusinessHistory(device, deviceId)</code>。</li>
@@ -903,6 +903,10 @@ const specs = {
           ['绑定概览', '当前绑定版本 / 配置状态 / 来源设备（1 主 + N 子）/ 生效区间；历史版本列表含变更摘要'],
           ['接入状态', '通信健康（selectHealth）+ 接入任务（IT-*）摘要'],
           ['业务履历', '该设备的全部动作履历（绑定变更、报警确认、派工、停机登记等）'],
+          ['关联业务记录 · 点检 / 巡检', '演示种子（standardData.js）按资产编码过滤任务明细行，按最新任务补齐计划 / 日期 / 状态口径；含应检 / 已检 / 未检、执行时间与跳过原因（只读，完整闭环由点巡保养业务模块承接）'],
+          ['关联业务记录 · 保养', '演示种子保养任务按「设备名 资产编码」匹配本设备：任务编号 / 计划 / 日期 / 负责人 / 状态 / 备注（只读）'],
+          ['关联业务记录 · 报修 / 维修工单', '演示状态机 repairReportsById / repairOrdersById 按 canonical deviceId 过滤；工单号可跳转 /repair-orders/:id 查看派工 / 执行 / 验收，动作后实时联动'],
+          ['关联业务记录 · 报警', '演示状态机 alarmEventsById 按 deviceId 过滤：报警 ID / 名称 / 级别 / 状态 / 触发指标与触发值 / 触发时间 / 持续时长'],
         ]} />
         <h4>交互规则</h4>
         <ol>

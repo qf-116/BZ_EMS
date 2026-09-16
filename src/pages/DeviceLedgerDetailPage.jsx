@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { Card, Descriptions, Tag, Button, Space, App, Alert } from 'antd';
+import { Card, Descriptions, Tag, Button, Space, App, Alert, Tabs, Table } from 'antd';
 import { ArrowLeft } from 'lucide-react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import PageHeader from '../components/PageHeader.jsx';
@@ -8,8 +8,12 @@ import EmptyState from '../components/EmptyState.jsx';
 import DataSourceBadge from '../components/DataSourceBadge.jsx';
 import { useDemoState } from '../state/DemoStore.jsx';
 import { selectDevice, selectBinding, selectHealth } from '../state/selectors.js';
+// 点检/保养/巡检为演示种子（完整闭环由点巡保养业务模块承接）；维修/报警来自演示状态机
+import { inspectionTaskDetails, inspectionTasks, maintenanceTasks, patrolTaskDetails, patrolPlanDevices, patrolTasks } from '../data/standardData.js';
 
 const hint = { fontSize: 12, color: '#5d6b78', lineHeight: 1.8 };
+const dash = (v) => (v === null || v === undefined || v === '' ? '--' : v);
+const emptyText = (label) => <span style={{ color: '#8a97a3' }}>该设备暂无{label}（演示数据未覆盖）</span>;
 
 // 设备档案详情：/device-ledger/detail/:deviceId；兼容旧 query（deviceId / code=资产编码）。
 // 展示台账字段 + 关联绑定 / 监测编码 / OEE 资格；无效编号显示「未找到对象」，禁止回退第一条。
@@ -36,6 +40,43 @@ export default function DeviceLedgerDetailPage() {
   const device = useMemo(() => (deviceId ? selectDevice(state, deviceId) : null), [state, deviceId]);
   const binding = useMemo(() => (deviceId ? selectBinding(state, deviceId) : null), [state, deviceId]);
   const health = useMemo(() => (deviceId ? selectHealth(state, deviceId) : null), [state, deviceId]);
+
+  // ===== 关联业务记录 =====
+  // 点检/巡检/保养：演示种子按资产编码（assetCode）过滤，任务明细为最近一次任务的设备行，按最新任务补齐计划口径；
+  // 维修/报警：演示状态机数据，按 canonical deviceId 过滤，跨页联动。
+  const records = useMemo(() => {
+    if (!device) return null;
+    const code = device.assetCode;
+    const latestInspectionTask = [...inspectionTasks].sort((a, b) => (b.date + b.createTime).localeCompare(a.date + a.createTime))[0];
+    const inspectionRows = inspectionTaskDetails.filter(d => d.code === code).map(d => ({
+      key: `XJ-${d.code}`,
+      plan: latestInspectionTask?.plan || '--',
+      date: latestInspectionTask?.date || '--',
+      owner: latestInspectionTask?.owner || '--',
+      taskStatus: latestInspectionTask?.status || '--',
+      items: d.itemNames || '--', itemCount: d.itemTotal, checked: d.checked, unchecked: d.unchecked,
+      execTime: d.execTime || '', skipReason: d.skipReason || '',
+    }));
+    const maintenanceRows = maintenanceTasks.filter(t => (t.device || '').includes(code)).map(t => ({ key: t.code, ...t }));
+    const latestPatrolTask = [...patrolTasks].sort((a, b) => (b.date + b.createTime).localeCompare(a.date + a.createTime))[0];
+    const patrolRows = patrolTaskDetails.filter(d => d.code === code).map(d => ({
+      key: `XJ-P-${d.code}`,
+      plan: latestPatrolTask?.plan || '--',
+      date: latestPatrolTask?.date || '--',
+      owner: latestPatrolTask?.owner || '--',
+      taskStatus: latestPatrolTask?.status || '--',
+      standard: patrolPlanDevices.find(p => p.code === code)?.standard || '--',
+      items: d.itemNames || '--', itemCount: d.itemCount, checked: d.checked, unchecked: d.unchecked,
+      execTime: d.execTime || '', skipReason: d.skipReason || '',
+    }));
+    const repairReportRows = Object.values(state.entities.repairReportsById)
+      .filter(r => r.deviceId === device.deviceId).map(r => ({ key: r.reportId, ...r }));
+    const repairOrderRows = Object.values(state.entities.repairOrdersById)
+      .filter(r => r.deviceId === device.deviceId).map(r => ({ key: r.repairOrderId, ...r }));
+    const alarmRows = Object.values(state.entities.alarmEventsById)
+      .filter(a => a.deviceId === device.deviceId).map(a => ({ key: a.id, ...a }));
+    return { inspectionRows, maintenanceRows, patrolRows, repairReportRows, repairOrderRows, alarmRows };
+  }, [device, state]);
 
   if (!device) {
     const shown = deviceIdParam || searchParams.get('deviceId') || searchParams.get('code') || '未提供设备编号';
@@ -130,6 +171,140 @@ export default function DeviceLedgerDetailPage() {
             description="未绑定设备不参与运行监测、报警判定与 OEE 统计；可在绑定总览中创建首个绑定。"
           />
         )}
+      </Card>
+
+      <Card size="small" style={{ marginBottom: 12 }} title="关联业务记录">
+        <Alert
+          type="info" showIcon style={{ marginBottom: 12 }}
+          message="点检 / 巡检 / 保养记录来自演示种子数据（只读，完整闭环由点巡保养业务模块承接）；报修 / 维修工单 / 报警记录来自演示状态机，动作会实时联动到本页。"
+        />
+        <Tabs
+          defaultActiveKey="inspection"
+          items={[
+            {
+              key: 'inspection', label: `点检记录（${records.inspectionRows.length}）`,
+              children: (
+                <Table
+                  rowKey="key" size="small" pagination={false}
+                  dataSource={records.inspectionRows}
+                  locale={{ emptyText: emptyText('点检记录') }}
+                  columns={[
+                    { title: '点检计划', dataIndex: 'plan', width: 180 },
+                    { title: '任务日期', dataIndex: 'date', width: 100 },
+                    { title: '任务状态', dataIndex: 'taskStatus', width: 90, render: (v) => <StatusTag value={v} /> },
+                    { title: '点检项目', dataIndex: 'items' },
+                    { title: '应检', dataIndex: 'itemCount', width: 70, align: 'center', render: dash },
+                    { title: '已检', dataIndex: 'checked', width: 70, align: 'center', render: dash },
+                    { title: '未检', dataIndex: 'unchecked', width: 70, align: 'center', render: (v) => (v > 0 ? <span style={{ color: '#cf1322' }}>{v}</span> : v) },
+                    { title: '执行时间', dataIndex: 'execTime', width: 130, render: dash },
+                    { title: '跳过原因', dataIndex: 'skipReason', render: dash },
+                  ]}
+                />
+              ),
+            },
+            {
+              key: 'maintenance', label: `保养记录（${records.maintenanceRows.length}）`,
+              children: (
+                <Table
+                  rowKey="key" size="small" pagination={false}
+                  dataSource={records.maintenanceRows}
+                  locale={{ emptyText: emptyText('保养记录') }}
+                  columns={[
+                    { title: '任务编号', dataIndex: 'code', width: 150 },
+                    { title: '保养计划', dataIndex: 'plan', width: 170 },
+                    { title: '保养日期', dataIndex: 'date', width: 100 },
+                    { title: '负责人', dataIndex: 'owner', width: 110, render: dash },
+                    { title: '状态', dataIndex: 'status', width: 90, render: (v) => <StatusTag value={v} /> },
+                    { title: '备注', dataIndex: 'remark', render: dash },
+                  ]}
+                />
+              ),
+            },
+            {
+              key: 'patrol', label: `巡检记录（${records.patrolRows.length}）`,
+              children: (
+                <Table
+                  rowKey="key" size="small" pagination={false}
+                  dataSource={records.patrolRows}
+                  locale={{ emptyText: emptyText('巡检记录') }}
+                  columns={[
+                    { title: '巡检计划', dataIndex: 'plan', width: 170 },
+                    { title: '巡检标准', dataIndex: 'standard', width: 160, render: dash },
+                    { title: '任务日期', dataIndex: 'date', width: 100 },
+                    { title: '任务状态', dataIndex: 'taskStatus', width: 90, render: (v) => <StatusTag value={v} /> },
+                    { title: '巡检项目', dataIndex: 'items' },
+                    { title: '应检', dataIndex: 'itemCount', width: 70, align: 'center', render: dash },
+                    { title: '已检', dataIndex: 'checked', width: 70, align: 'center', render: dash },
+                    { title: '未检', dataIndex: 'unchecked', width: 70, align: 'center', render: (v) => (v > 0 ? <span style={{ color: '#cf1322' }}>{v}</span> : v) },
+                    { title: '执行时间', dataIndex: 'execTime', width: 130, render: dash },
+                    { title: '跳过原因', dataIndex: 'skipReason', render: dash },
+                  ]}
+                />
+              ),
+            },
+            {
+              key: 'repair', label: `维修记录（${records.repairReportRows.length + records.repairOrderRows.length}）`,
+              children: (
+                <>
+                  <div style={{ fontWeight: 600, margin: '4px 0 8px' }}>报修登记（{records.repairReportRows.length}）</div>
+                  <Table
+                    rowKey="key" size="small" pagination={false} style={{ marginBottom: 12 }}
+                    dataSource={records.repairReportRows}
+                    locale={{ emptyText: emptyText('报修登记') }}
+                    columns={[
+                      { title: '报修编号', dataIndex: 'reportId', width: 150 },
+                      { title: '报修标题', dataIndex: 'title' },
+                      { title: '故障类型', dataIndex: 'faultType', width: 90, render: dash },
+                      { title: '级别', dataIndex: 'level', width: 80, render: (v) => <StatusTag value={v} /> },
+                      { title: '状态', dataIndex: 'status', width: 100, render: (v) => <StatusTag value={v} /> },
+                      { title: '报修人', dataIndex: 'creator', width: 90, render: dash },
+                      { title: '报修时间', dataIndex: 'createTime', width: 140, render: dash },
+                    ]}
+                  />
+                  <div style={{ fontWeight: 600, margin: '4px 0 8px' }}>维修工单（{records.repairOrderRows.length}）</div>
+                  <Table
+                    rowKey="key" size="small" pagination={false}
+                    dataSource={records.repairOrderRows}
+                    locale={{ emptyText: emptyText('维修工单') }}
+                    columns={[
+                      {
+                        title: '工单号', dataIndex: 'repairOrderId', width: 150,
+                        render: (v, r) => <a onClick={() => navigate(`/repair-orders/${r.repairOrderId}`)}>{v}</a>,
+                      },
+                      { title: '工单标题', dataIndex: 'title' },
+                      { title: '故障类型', dataIndex: 'faultType', width: 90, render: dash },
+                      { title: '级别', dataIndex: 'level', width: 80, render: (v) => <StatusTag value={v} /> },
+                      { title: '状态', dataIndex: 'status', width: 100, render: (v) => <StatusTag value={v} /> },
+                      { title: '维修人', dataIndex: 'assignee', width: 90, render: dash },
+                      { title: '创建时间', dataIndex: 'createdAt', width: 140, render: dash },
+                    ]}
+                  />
+                </>
+              ),
+            },
+            {
+              key: 'alarm', label: `报警记录（${records.alarmRows.length}）`,
+              children: (
+                <Table
+                  rowKey="key" size="small" pagination={false}
+                  dataSource={records.alarmRows}
+                  locale={{ emptyText: emptyText('报警记录') }}
+                  columns={[
+                    { title: '报警ID', dataIndex: 'id', width: 160 },
+                    { title: '报警名称', dataIndex: 'name' },
+                    { title: '级别', dataIndex: 'severity', width: 80, render: (v) => <StatusTag value={v} /> },
+                    { title: '状态', dataIndex: 'status', width: 110, render: (v) => <StatusTag value={v} /> },
+                    { title: '触发指标', dataIndex: 'metric', width: 100, render: dash },
+                    { title: '触发值', dataIndex: 'trigger', width: 100, render: dash },
+                    { title: '触发时间', dataIndex: 'time', width: 100, render: dash },
+                    { title: '持续时长', dataIndex: 'duration', width: 100, render: dash },
+                  ]}
+                />
+              ),
+            },
+          ]}
+        />
+        <div style={hint}>维修工单可在「维修管理」中派工 / 执行 / 验收；状态变化实时反映在本页与各业务页面。</div>
       </Card>
 
       <Card size="small" style={{ marginBottom: 12 }} title="OEE 资格">
