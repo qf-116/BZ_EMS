@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Card, Table, Button, Space, Input, Select, Tree, App, Modal, Form, DatePicker, Upload, Tag } from 'antd';
+import { Card, Table, Button, Space, Input, Select, Tree, App, Modal, Form, DatePicker, Upload, Tag, Row, Col } from 'antd';
 import { Upload as UploadIcon, Plus, Download, Printer, Pencil, Trash2 } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import dayjs from 'dayjs';
 import PageHeader from '../components/PageHeader.jsx';
 import StatusTag from '../components/StatusTag.jsx';
 import EmptyState from '../components/EmptyState.jsx';
@@ -44,8 +45,10 @@ export default function DeviceLedgerPage() {
       lifecycleStatus: device.lifecycleStatus,
       owner: device.owner,
       enableDate: device.enableDate,
+      buyDate: device.buyDate,
       assetNo: device.assetNo,
       oeeEligible: device.oeeEligible,
+      networked: binding?.configStatus && binding.configStatus !== '未配置' ? '是' : '否',
       bindingStatus: binding?.configStatus || '未配置',
       healthStatus: lifecycleOnly ? null : health.status,
       runStatus: lifecycleOnly ? null : realtime.runStatus,
@@ -177,10 +180,10 @@ export default function DeviceLedgerPage() {
         </div>
       </div>
 
-      {/* 新增/编辑设备档案（演示弹窗：不修改演示快照中的台账事实） */}
+      {/* 新增/编辑设备档案（演示弹窗：不修改演示快照中的台账事实；字段对齐已上线原型，双列布局） */}
       <Modal
         title={editing ? `编辑设备档案（${editing.assetCode}）` : '新增设备档案'}
-        width={860}
+        width={920}
         open={modalOpen}
         destroyOnClose
         onCancel={() => setModalOpen(false)}
@@ -189,25 +192,59 @@ export default function DeviceLedgerPage() {
           <Button key="ok" type="primary" onClick={() => { setModalOpen(false); message.info('演示快照模式：台账编辑不保存，重置演示可恢复初始数据'); }}>确认</Button>,
         ]}
       >
-        <Form labelCol={{ span: 6 }} wrapperCol={{ span: 16 }} labelWrap initialValues={editing || {}} style={{ maxHeight: '60vh', overflowY: 'auto', paddingRight: 8 }}>
-          <Form.Item label="资产编号" required><Input value={editing ? editing.assetCode : '新增由平台生成（演示）'} disabled /></Form.Item>
-          <Form.Item label="设备名称" name="name" required><Input placeholder="请输入设备名称" /></Form.Item>
-          <Form.Item label="设备类型" name="type">
-            <Select placeholder="请选择设备类型" options={[...new Set(rows.map(r => r.type).filter(Boolean))].map(v => ({ value: v, label: v }))} />
-          </Form.Item>
-          <Form.Item label="规格型号" name="model"><Input placeholder="请输入规格型号" /></Form.Item>
-          <Form.Item label="品牌" name="brand"><Input placeholder="请输入品牌" /></Form.Item>
-          <Form.Item label="车间" name="workshopName"><Input placeholder="请输入车间" /></Form.Item>
-          <Form.Item label="产线" name="lineName"><Input placeholder="请输入产线" /></Form.Item>
-          <Form.Item label="设备负责人" name="owner"><Input placeholder="请输入设备负责人" /></Form.Item>
-          <Form.Item label="生命周期" name="lifecycleStatus">
-            <Select placeholder="请选择生命周期" options={['在用', '闲置', '停用', '报废/归档'].map(v => ({ value: v, label: v }))} />
-          </Form.Item>
-          <Form.Item label="资产编号（档案）" name="assetNo"><Input placeholder="请输入资产编号" /></Form.Item>
-          <Form.Item label="采购日期" name="buyDate"><DatePicker style={{ width: '100%' }} placeholder="请选择日期" /></Form.Item>
-          <Form.Item label="启用日期" name="enableDate"><DatePicker style={{ width: '100%' }} placeholder="请选择日期" /></Form.Item>
-          <Form.Item label="设备图片"><Upload maxCount={5}><Button>上传图片</Button></Upload></Form.Item>
-          <Form.Item label="备注"><Input.TextArea rows={2} placeholder="请输入备注" /></Form.Item>
+        {/* 编辑时日期字段须转 dayjs 对象（直接传字符串会让 DatePicker 崩溃白屏） */}
+        <Form
+          labelCol={{ span: 9 }} wrapperCol={{ span: 15 }} labelWrap
+          initialValues={(() => {
+            if (!editing) return {};
+            const toDay = (v) => (v ? dayjs(v) : undefined);
+            return {
+              ...editing,
+              enableDate: toDay(editing.enableDate),
+              buyDate: toDay(editing.buyDate),
+              oeeFlag: editing.oeeEligible ? '是' : '否',
+            };
+          })()}
+          style={{ maxHeight: '62vh', overflowY: 'auto', paddingRight: 8 }}
+        >
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item label="资产编号" required><Input value={editing ? editing.assetCode : '新增由平台生成（演示）'} disabled /></Form.Item>
+              <Form.Item label="设备名称" name="name" rules={[{ required: true, message: '请输入设备名称' }]}><Input placeholder="请输入设备名称" /></Form.Item>
+              <Form.Item label="设备类型" name="type">
+                <Select placeholder="请选择设备类型" options={[...new Set(rows.map(r => r.type).filter(Boolean))].map(v => ({ value: v, label: v }))} />
+              </Form.Item>
+              <Form.Item label="规格型号" name="model"><Input placeholder="请输入规格型号" /></Form.Item>
+              <Form.Item label="品牌" name="brand"><Input placeholder="请输入品牌" /></Form.Item>
+              <Form.Item label="车间" name="workshopName"><Input placeholder="请输入车间" /></Form.Item>
+              <Form.Item label="产线" name="lineName"><Input placeholder="请输入产线" /></Form.Item>
+              <Form.Item label="工位" name="stationName"><Input placeholder="请输入工位" /></Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item label="状态" name="lifecycleStatus">
+                <Select placeholder="请选择状态" options={['在用', '闲置', '停用', '报废/归档'].map(v => ({ value: v, label: v }))} />
+              </Form.Item>
+              <Form.Item label="设备负责人" name="owner"><Input placeholder="请输入设备负责人" /></Form.Item>
+              <Form.Item label="资产编号（档案）" name="assetNo"><Input placeholder="请输入资产编号（档案）" /></Form.Item>
+              <Form.Item label="是否联网" name="networked" tooltip={editing ? '由绑定状态推导，演示模式不可修改' : undefined}>
+                <Select disabled={!!editing} options={['是', '否'].map(v => ({ value: v, label: v }))} placeholder="请选择是否联网" />
+              </Form.Item>
+              <Form.Item label="OEE统计" name="oeeFlag" tooltip={editing ? '由理想速度与绑定配置推导，演示模式不可修改' : undefined}>
+                <Select disabled={!!editing} options={['是', '否'].map(v => ({ value: v, label: v }))} placeholder="请选择是否纳入 OEE 统计" />
+              </Form.Item>
+              <Form.Item label="启用日期" name="enableDate"><DatePicker style={{ width: '100%' }} placeholder="请选择启用日期" /></Form.Item>
+              <Form.Item label="采购日期" name="buyDate"><DatePicker style={{ width: '100%' }} placeholder="请选择采购日期" /></Form.Item>
+              <Form.Item label="停用日期" name="disableDate"><DatePicker style={{ width: '100%' }} placeholder="请选择停用日期" /></Form.Item>
+            </Col>
+          </Row>
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item label="设备图片" labelCol={{ span: 9 }} wrapperCol={{ span: 15 }}><Upload maxCount={5}><Button>上传图片</Button></Upload></Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item label="备注" labelCol={{ span: 9 }} wrapperCol={{ span: 15 }}><Input.TextArea rows={2} placeholder="请输入备注" /></Form.Item>
+            </Col>
+          </Row>
         </Form>
       </Modal>
     </>
