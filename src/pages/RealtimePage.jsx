@@ -24,14 +24,19 @@ const stateMeta = {
   无数据: { color: '#55636e' },
 };
 
+// 折叠态指标区可见行数（约）：超过该数量出现「展开全部」，展开后卡片局部变高
+const METRIC_CLAMP = 4;
+
 function DeviceCard({ row }) {
   const navigate = useNavigate();
+  const [expanded, setExpanded] = useState(false);
   const rt = row.realtime;
   const state = rt.runStatus || '无数据';
   const color = stateMeta[state]?.color || '#55636e';
   const interrupted = rt.healthStatus === '数据中断';
   const delayed = rt.healthStatus === '延迟';
   const oee = row.oee;
+  const needClamp = rt.metrics.length > METRIC_CLAMP;
 
   return (
     <div className="rt-card" style={{ '--st': color }}>
@@ -68,21 +73,30 @@ function DeviceCard({ row }) {
           </div>
         </div>
       </div>
-      <div className="rt-metrics">
-        {rt.metrics.length === 0 ? (
-          <div style={{ gridColumn: '1 / -1', fontSize: 12, color: '#8a97a3', padding: '4px 0' }}>
-            绑定未配置启用指标，暂无可展示数据
-          </div>
-        ) : rt.metrics.map(m => (
-          <div key={`${m.iotDeviceCode}|${m.metricCode}`} className={`rt-metric${m.qualityCode === 'OFFLINE' || m.qualityCode === 'NO_VALUE' ? '' : ''}`} title={`质量码 ${m.qualityCode}${m.sourceTime ? ` · 采集 ${m.sourceTime}` : ''}`}>
-            <span className="n">{m.name}</span>
-            <span className="v">{m.value ?? '--'}</span>
-            <span className="u">{m.value == null ? '' : m.unit || ''}</span>
-            <Tag color={QUALITY_COLOR[m.qualityCode] || 'default'} style={{ fontSize: 10, lineHeight: '16px', marginRight: 0, marginLeft: 4 }}>
-              {QUALITY_LABEL[m.qualityCode] || m.qualityCode}
-            </Tag>
-          </div>
-        ))}
+      {/* 指标区固定高度 + 滚动（超 METRIC_CLAMP 项可「展开全部」），保证卡片等高、页面协调 */}
+      <div className="rt-metrics-wrap">
+        <div className="rt-metrics-head">
+          <span>实时指标（{rt.metrics.length}）</span>
+          {needClamp && (
+            <a onClick={() => setExpanded(!expanded)}>{expanded ? '收起 ▴' : `展开全部（${rt.metrics.length} 项）▾`}</a>
+          )}
+        </div>
+        <div className={`rt-metrics${!expanded ? ' clamp' : ''}`}>
+          {rt.metrics.length === 0 ? (
+            <div style={{ gridColumn: '1 / -1', fontSize: 12, color: '#8a97a3', padding: '4px 0' }}>
+              绑定未配置启用指标，暂无可展示数据
+            </div>
+          ) : rt.metrics.map(m => (
+            <div key={`${m.iotDeviceCode}|${m.metricCode}`} className="rt-metric" title={`质量码 ${m.qualityCode}${m.sourceTime ? ` · 采集 ${m.sourceTime}` : ''}`}>
+              <span className="n">{m.name}</span>
+              <span className="v">{m.value ?? '--'}</span>
+              <span className="u">{m.value == null ? '' : m.unit || ''}</span>
+              <Tag color={QUALITY_COLOR[m.qualityCode] || 'default'} style={{ fontSize: 10, lineHeight: '16px', marginRight: 0, marginLeft: 4 }}>
+                {QUALITY_LABEL[m.qualityCode] || m.qualityCode}
+              </Tag>
+            </div>
+          ))}
+        </div>
       </div>
       <div className="rt-foot">
         <span>{interrupted

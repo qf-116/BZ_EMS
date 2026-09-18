@@ -543,20 +543,42 @@ body {
 .rt-info-row { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); }
 .rt-info-row b { font-weight: 600; color: var(--ink); font-family: var(--font-num); font-variant-numeric: tabular-nums; }
 .rt-info-row b.warn { color: var(--danger); }
+.rt-metrics-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 0 12px;
+  padding: 7px 0 0;
+  border-top: 1px solid #edf2f6;
+  font-size: 11px;
+  color: var(--muted);
+}
+.rt-metrics-head a { color: var(--brand-bright); cursor: pointer; white-space: nowrap; }
+.rt-metrics-head a:hover { text-decoration: underline; }
 .rt-metrics {
   margin: 0 12px;
-  border-top: 1px solid #edf2f6;
-  padding: 8px 0 10px;
+  padding: 5px 0 8px;
 }
+/* 折叠态：固定高度（≈4 行指标）保证所有卡片等高，超出部分滚动（细滚动条） */
+.rt-metrics.clamp {
+  height: 101px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  padding-right: 4px;
+}
+.rt-metrics.clamp::-webkit-scrollbar { width: 4px; }
+.rt-metrics.clamp::-webkit-scrollbar-thumb { background: #d9e2e9; border-radius: 2px; }
+.rt-metrics.clamp::-webkit-scrollbar-track { background: transparent; }
 .rt-metric {
   display: grid;
-  grid-template-columns: 1fr auto auto;
+  /* 名称 / 数值 / 单位 / 质量码 Tag 同一行（此前 3 列导致 Tag 换行、行高被撑到 44px） */
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
   align-items: baseline;
   column-gap: 8px;
   font-size: 12px;
   padding: 3px 0;
 }
-.rt-metric .n { color: var(--muted); }
+.rt-metric .n { color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .rt-metric .v { font-weight: 600; font-family: var(--font-num); font-variant-numeric: tabular-nums; color: var(--ink); }
 .rt-metric .u { color: var(--muted); font-size: 11px; min-width: 44px; }
 .rt-metric.over .n, .rt-metric.over .v { color: var(--danger); }
