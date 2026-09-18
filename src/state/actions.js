@@ -53,12 +53,6 @@ export function createDemoActions(state, dispatch) {
       act('binding/removeSource', { deviceId, iotDeviceId });
       return { ok: true, message: '已从绑定草稿移除（未保存）', refs: { deviceId } };
     },
-    // 指定来源角色（主设备/子设备）：IoT 上报类型不作判定依据，角色在绑定时由本系统指定；
-    // 设为主设备时原主设备自动降为子设备（每绑定恰好 1 个主设备，子设备可多个）
-    setBindingSourceRole(deviceId, iotDeviceId, role) {
-      act('binding/setSourceRole', { deviceId, iotDeviceId, role });
-      return { ok: true, message: role === 'main' ? '已设为主设备（原主设备已自动改为子设备）' : '已设为子设备', refs: { deviceId } };
-    },
     toggleBindingMetric(deviceId, iotDeviceId, metricCode) {
       act('binding/toggleMetric', { deviceId, iotDeviceId, metricCode });
       return { ok: true, message: '指标选择已切换（未保存）', refs: { deviceId } };
@@ -72,7 +66,7 @@ export function createDemoActions(state, dispatch) {
       return { ok: true, message: `绑定模板「${name}」已删除`, refs: {} };
     },
     // 批量应用模板：按模板结构为每台设备构造绑定（IoT 来源编码演示模拟：
-    // 由物联网平台按设备自动分配专属编码 IOT-D/IOT-S-2xx，全局唯一，不与已占用编码冲突）
+    // 由物联网平台按设备自动分配专属编码 IOT-2xx，全局唯一，不与已占用编码冲突）
     applyBindingTemplate({ deviceIds, template, autoEnable }) {
       if (!template) return fail('请先选择绑定模板');
       if (!deviceIds || deviceIds.length === 0) return fail('请先选择要应用的设备');
@@ -84,12 +78,11 @@ export function createDemoActions(state, dispatch) {
         const device = E.devicesById[deviceId];
         const items = (template.items || []).map((t) => {
           seq += 1;
-          const code = t.role === 'main' ? `IOT-D-2${100 + seq}` : `IOT-S-2${100 + seq}`;
           return {
-            iotDeviceId: `iot-auto-${bindingId}-${seq}`, iotDeviceCode: code,
-            name: `${device?.name || deviceId} ${t.kind === '主设备' ? '主控制器' : (t.sensorType || '传感器')}`,
-            role: t.role, sensorType: t.role === 'main' ? '--' : (t.sensorType || t.kind || '子传感器'),
-            kind: t.kind, enabled: true,
+            iotDeviceId: `iot-auto-${bindingId}-${seq}`, iotDeviceCode: `IOT-2${100 + seq}`,
+            name: `${device?.name || deviceId} ${t.sensorType || '来源设备'}`,
+            sensorType: t.sensorType || '来源设备',
+            enabled: true,
             metrics: (t.metrics || []).map(m => ({ ...m, selected: true })),
           };
         });

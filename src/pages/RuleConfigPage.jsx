@@ -29,7 +29,7 @@ const sourceOptions = (devCode) => {
   const b = netBindings.find(x => x.code === devCode);
   return (b?.items || []).filter(i => i.enabled).map(i => ({
     value: i.iotDeviceCode,
-    label: `${i.iotDeviceCode} ${i.role === 'main' ? '主设备' : i.sensorType}`,
+    label: `${i.iotDeviceCode}${i.sensorType && i.sensorType !== '--' ? ` ${i.sensorType}` : ''}`,
   }));
 };
 const metricOptions = (devCode, iotCode) => {

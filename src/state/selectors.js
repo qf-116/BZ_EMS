@@ -83,10 +83,11 @@ export function selectRealtime(state, deviceId) {
         metricVersion: m.metricVersion,
       };
     }));
-  const mainItem = (binding?.items || []).find(i => i.enabled && i.role === 'main');
+  // 设备状态样本来源：任一启用的来源设备勾选了 S.machine_state 即可（来源不再分主/子）
+  const stateItem = (binding?.items || []).find(i => i.enabled && (i.metrics || []).some(m => m.selected && m.metricCode === 'S.machine_state'));
   const stateSample = disconnected
     ? null
-    : samples.find(s => s.sourceId === mainItem?.iotDeviceId && s.metricCode === 'S.machine_state');
+    : samples.find(s => s.sourceId === stateItem?.iotDeviceId && s.metricCode === 'S.machine_state');
   return {
     deviceId,
     bindingStatus: binding?.configStatus || '未配置',

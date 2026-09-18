@@ -340,14 +340,14 @@ export default function DeviceLedgerDetailPage() {
               协议 / 网关 / IP / 端口 / 点表由 IoT 平台接入服务维护，本系统不存储也不展示具体值（-- 表示由平台管理，非未配置）。
             </div>
           </Card>
-          <Card size="small" title={`来源设备（主设备 + 子传感器 · 共 ${(binding.items || []).length} 个，已选指标 ${totalSelected} 项）`}>
+          <Card size="small" title={`来源设备（共 ${(binding.items || []).length} 个，已选指标 ${totalSelected} 项）`}>
             <Table
               rowKey="iotDeviceId" size="small" pagination={false}
               dataSource={binding.items || []}
               locale={{ emptyText: emptyText('来源设备') }}
               columns={[
                 { title: '编码', dataIndex: 'iotDeviceCode', width: 140 },
-                { title: '角色', width: 110, render: (_, r) => (r.role === 'main' ? <Tag color="blue">主设备</Tag> : <Tag color="cyan">{r.sensorType || '子传感器'}</Tag>) },
+                { title: '类型', width: 110, render: (_, r) => (r.sensorType && r.sensorType !== '--' ? <Tag color="cyan">{r.sensorType}</Tag> : '--') },
                 { title: '启用', dataIndex: 'enabled', width: 90, render: v => <StatusTag value={v ? '已启用' : '已停用'} /> },
                 {
                   title: '已选指标', render: (_, r) => (
@@ -545,6 +545,7 @@ export default function DeviceLedgerDetailPage() {
         activeKey={activeTab || undefined}
         onChange={setActiveTab}
         items={tabItems}
+        tabBarGutter={16}
       />
     </>
   );

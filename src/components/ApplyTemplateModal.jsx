@@ -78,7 +78,7 @@ export default function ApplyTemplateModal({ open, initialTemplateId, onClose })
       </Checkbox>
       {template && (
         <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginTop: 10, marginBottom: 0 }}>
-          模板结构：{template.items.map((i) => `${i.kind === '主设备' ? '1 主设备' : `1 ${i.sensorType || '子传感器'}`}×${(i.metrics || []).filter((m) => m.selected).length} 指标`).join(' + ')}，共 {metricCount} 项有效指标。
+          模板结构：{template.items.map((i) => `1 ${i.sensorType || '来源设备'}×${(i.metrics || []).filter((m) => m.selected).length} 指标`).join(' + ')}，共 {metricCount} 项有效指标。
         </Typography.Paragraph>
       )}
     </Modal>

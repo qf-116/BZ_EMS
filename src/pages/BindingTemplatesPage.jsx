@@ -1,14 +1,14 @@
 // ============================================================
 // 绑定模板管理（/binding-templates · 数据接入域）
 // 绑定模板独立管理页：新建 / 编辑 / 删除 / 应用到设备（批量）。
-// 模板记录「来源结构（1 主设备 + N 子传感器）+ 指标口径」，不记录具体 IoT 编码——
+// 模板记录「来源结构（N 个平级来源设备，不分主/子）+ 指标口径」，不记录具体 IoT 编码——
 // 批量应用时由物联网平台按设备自动分配专属来源编码（演示模拟，见 actions.applyBindingTemplate）。
 // 保存走 bindingTemplate/save（reducer 按 templateId upsert：同 id 即编辑，保留原创建时间）。
 // ============================================================
 
 import React, { useMemo, useState } from 'react';
 import {
-  App, Alert, AutoComplete, Button, Card, Checkbox, Empty, Input, Modal, Select, Space, Table, Tag, Typography,
+  App, Alert, AutoComplete, Button, Card, Checkbox, Empty, Input, Modal, Space, Table, Tag, Typography,
 } from 'antd';
 import { LayoutTemplate, Plus, Trash2, Edit3, Copy } from 'lucide-react';
 import PageHeader from '../components/PageHeader.jsx';
@@ -43,19 +43,16 @@ function TemplateEditorModal({ template, open, onClose }) {
     setItems(template
       ? (template.items || []).map((i) => ({
         uid: nextUid(),
-        role: i.role,
-        kind: i.kind || (i.role === 'main' ? '主设备' : '子传感器'),
-        sensorType: i.sensorType || '',
+        sensorType: (i.sensorType && i.sensorType !== '--' ? i.sensorType : '') || (i.kind && i.kind !== '主设备' ? i.kind : '') || '',
         metrics: (i.metrics || []).map((m) => ({ metricCode: m.metricCode, metricVersion: m.metricVersion, selected: !!m.selected })),
       }))
       : []);
   }
   if (!open && openKey) setOpenKey('');
 
-  const addItem = (role) => {
+  const addItem = () => {
     setItems((prev) => [...prev, {
-      uid: nextUid(), role,
-      kind: role === 'main' ? '主设备' : '子传感器',
+      uid: nextUid(),
       sensorType: '',
       metrics: [],
     }]);
@@ -78,13 +75,11 @@ function TemplateEditorModal({ template, open, onClose }) {
     }));
   };
 
-  const mains = items.filter((i) => i.role === 'main');
   const problems = [];
   if (!name.trim()) problems.push('请填写模板名称');
   if (items.length === 0) problems.push('至少添加 1 个来源结构');
-  if (mains.length !== 1) problems.push('必须恰好 1 个「主设备」来源');
   items.forEach((i, idx) => {
-    if (i.role !== 'main' && !(i.sensorType || '').trim()) problems.push(`来源 ${idx + 1}：请填写传感器类型`);
+    if (!(i.sensorType || '').trim()) problems.push(`来源 ${idx + 1}：请填写来源类型`);
     if ((i.metrics || []).filter((m) => m.selected).length === 0) problems.push(`来源 ${idx + 1}：至少选择 1 项指标`);
   });
 
@@ -95,9 +90,7 @@ function TemplateEditorModal({ template, open, onClose }) {
       name: name.trim(),
       sourceName: template?.sourceName || '绑定模板管理页创建',
       items: items.map((i) => ({
-        role: i.role,
-        kind: i.role === 'main' ? '主设备' : '子传感器',
-        sensorType: i.role === 'main' ? '--' : i.sensorType.trim(),
+        sensorType: i.sensorType.trim(),
         metrics: (i.metrics || []).map((m) => ({ metricCode: m.metricCode, metricVersion: m.metricVersion, selected: !!m.selected })),
       })),
     };
@@ -117,7 +110,7 @@ function TemplateEditorModal({ template, open, onClose }) {
     >
       <Alert
         type="info" showIcon style={{ marginBottom: 12 }}
-        message="模板记录来源结构（1 主设备 + 子传感器组合）与指标口径，不记录具体 IoT 编码——批量应用时由物联网平台按设备自动分配专属来源编码（演示模拟），同一模板可应用到任意多台设备。"
+        message="模板记录来源结构（N 个平级来源设备，不分主/子）与指标口径，不记录具体 IoT 编码——批量应用时由物联网平台按设备自动分配专属来源编码（演示模拟），同一模板可应用到任意多台设备。"
       />
       <div style={{ marginBottom: 10 }}>
         <div style={{ fontSize: 12, color: '#5d6b78', marginBottom: 4 }}>模板名称 <span style={{ color: '#cf1322' }}>*</span></div>
@@ -126,42 +119,32 @@ function TemplateEditorModal({ template, open, onClose }) {
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
         <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-          来源结构（必须恰好 1 个主设备，可加多个子传感器；每个来源至少选 1 项指标）
+          来源结构（来源设备平级、不分主/子；每个来源至少选 1 项指标）
         </Typography.Text>
         <Space size={8}>
-          <Button size="small" type="primary" ghost icon={<Plus size={13} />} onClick={() => addItem('main')}>添加主设备</Button>
-          <Button size="small" icon={<Plus size={13} />} onClick={() => addItem('sensor')}>添加子传感器</Button>
+          <Button size="small" type="primary" ghost icon={<Plus size={13} />} onClick={addItem}>添加来源设备</Button>
         </Space>
       </div>
 
       {items.length === 0 && (
-        <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="尚未添加来源结构：请点击右上角「添加主设备 / 添加子传感器」" />
+        <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="尚未添加来源结构：请点击右上角「添加来源设备」" />
       )}
       {items.map((item, idx) => {
         const selCount = (item.metrics || []).filter((m) => m.selected).length;
-        const err = selCount === 0 || (item.role !== 'main' && !(item.sensorType || '').trim());
+        const err = selCount === 0 || !(item.sensorType || '').trim();
         return (
           <Card
             key={item.uid} size="small" style={{ marginBottom: 8, borderColor: err ? '#ffa39e' : undefined }}
             title={(
               <Space size={8} wrap>
                 <span>来源 {idx + 1}</span>
-                <Select
-                  size="small" style={{ width: 120 }} value={item.role}
-                  options={[{ value: 'main', label: '主设备' }, { value: 'sensor', label: '子传感器' }]}
-                  onChange={(v) => patchItem(item.uid, { role: v, kind: v === 'main' ? '主设备' : '子传感器', sensorType: v === 'main' ? '' : item.sensorType })}
+                <AutoComplete
+                  size="small" style={{ width: 180 }}
+                  placeholder="来源类型（如：主控制器 / 振动传感器）"
+                  value={item.sensorType}
+                  options={SENSOR_TYPE_SUGGESTIONS.map((s) => ({ value: s }))}
+                  onChange={(v) => patchItem(item.uid, { sensorType: v })}
                 />
-                {item.role !== 'main' && (
-                  <AutoComplete
-                    size="small" style={{ width: 180 }}
-                    placeholder="传感器类型（如：振动传感器）"
-                    value={item.sensorType}
-                    options={SENSOR_TYPE_SUGGESTIONS.map((s) => ({ value: s }))}
-                    onChange={(v) => patchItem(item.uid, { sensorType: v })}
-                  />
-                )}
-                {item.role === 'main' && <Tag color="blue">主设备（每模板恰 1 个）</Tag>}
-                {mains.length > 1 && item.role === 'main' && <Tag color="error">主设备多于 1 个</Tag>}
               </Space>
             )}
             extra={(
@@ -268,8 +251,8 @@ export default function BindingTemplatesPage() {
               {
                 title: '来源结构', width: 240,
                 render: (_, t) => t.items.map((i, idx) => (
-                  <Tag key={idx} color={i.role === 'main' ? 'blue' : 'default'}>
-                    {i.kind === '主设备' ? '主设备' : (i.sensorType || '子传感器')}×{(i.metrics || []).filter((m) => m.selected).length}
+                  <Tag key={idx}>
+                    {i.sensorType && i.sensorType !== '--' ? i.sensorType : '来源设备'}×{(i.metrics || []).filter((m) => m.selected).length}
                   </Tag>
                 )),
               },
