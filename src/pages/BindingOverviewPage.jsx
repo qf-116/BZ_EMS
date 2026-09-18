@@ -13,7 +13,7 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-  App, Alert, Button, Card, Checkbox, Col, Input, Modal, Row, Space, Statistic, Steps, Table, Tag, Tooltip, Typography,
+  App, Alert, Button, Card, Checkbox, Col, Input, Modal, Row, Select, Space, Statistic, Steps, Table, Tag, Tooltip, Typography,
 } from 'antd';
 import { Plus, ShieldCheck, Save, Play, PauseCircle, Settings2, LayoutTemplate, Trash2, ArrowRight, ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -36,6 +36,9 @@ function BindingDraftModal({ deviceId: presetDeviceId, deviceName, open, onClose
   const [step, setStep] = useState(0);                        // 向导步骤：0=选设备，1=选 IoT 来源，2=选指标
   const [deviceId, setDeviceId] = useState(null);             // 向导内选定的设备管理台账设备
   const [validateResult, setValidateResult] = useState(null); // UI 局部状态：仅展示校验结果
+  const [devKw, setDevKw] = useState('');                     // 第 1 步查询条件：编号/名称/资产编码
+  const [devBound, setDevBound] = useState('all');            // 第 1 步查询条件：是否已绑定
+  const [devType, setDevType] = useState('all');              // 第 1 步查询条件：设备类型
   const [sourceKw, setSourceKw] = useState('');               // 来源列表搜索（设备多时缓解弹窗拥挤）
   const [tplNameOpen, setTplNameOpen] = useState(false);      // 存为模板：命名小弹窗
   const [tplName, setTplName] = useState('');
@@ -58,6 +61,9 @@ function BindingDraftModal({ deviceId: presetDeviceId, deviceName, open, onClose
       setDeviceId(presetDeviceId || null);
       setValidateResult(null);
       setSourceKw('');
+      setDevKw('');
+      setDevBound('all');
+      setDevType('all');
     }
   }, [open, presetDeviceId]);
 
@@ -75,10 +81,24 @@ function BindingDraftModal({ deviceId: presetDeviceId, deviceName, open, onClose
   const draftItems = draft?.items || [];
   const metricCount = draftItems.reduce((s, i) => s + (i.metrics || []).filter((m) => m.selected).length, 0);
   const selectedDevice = allDevices.find((d) => d.deviceId === deviceId);
+  // 设备绑定情况：已有绑定（含历史停用）即视为「已绑定」——不能重复新建，只能换绑；
+  // 未保存的草稿不算已绑定（放弃草稿即可重新新建）
+  const boundOf = (devId) => state.entities.bindingsByDeviceId[devId] || null;
+  const deviceRows = useMemo(() => {
+    const k = devKw.trim().toLowerCase();
+    return allDevices
+      .map((d) => ({ ...d, bound: !!boundOf(d.deviceId) }))
+      .filter((d) => (devBound === 'all' ? true : devBound === 'bound' ? d.bound : !d.bound))
+      .filter((d) => (devType === 'all' ? true : d.type === devType))
+      .filter((d) => (!k ? true : `${d.deviceId} ${d.name} ${d.assetCode}`.toLowerCase().includes(k)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allDevices, state.entities.bindingsByDeviceId, devKw, devBound, devType]);
+  const deviceTypes = useMemo(() => [...new Set(allDevices.map((d) => d.type).filter(Boolean))], [allDevices]);
 
   const goNext = () => {
     if (step === 0) {
       if (!deviceId) { message.warning('请先选择设备管理系统的设备'); return; }
+      if (boundOf(deviceId)) { message.warning('该设备已绑定设备指标，不能重复绑定：请关闭后使用列表中的「换绑」'); return; }
       setValidateResult(null);
       setStep(1);
       return;
@@ -198,33 +218,73 @@ function BindingDraftModal({ deviceId: presetDeviceId, deviceName, open, onClose
       {step === 0 && (
         <>
           <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginBottom: 6 }}>
-            第 1 步 · 选择设备管理系统的设备（点击行选中；选中后进入第 2 步为其勾选 IoT 来源设备）
+            第 1 步 · 选择设备管理系统的设备（点击行选中；已绑定设备不能重复绑定，仅可换绑）
           </Typography.Paragraph>
-          <div style={{ border: '1px solid #eef1f4', borderRadius: 6, padding: '8px 12px', marginBottom: 12, maxHeight: 320, overflow: 'auto' }}>
-            {allDevices.map((d) => {
-              const binding = state.entities.bindingsByDeviceId[d.deviceId];
-              const status = binding?.configStatus || '未配置';
-              const selected = d.deviceId === deviceId;
-              return (
-                <div
-                  key={d.deviceId}
-                  onClick={() => { setDeviceId(d.deviceId); setValidateResult(null); }}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px', cursor: 'pointer', borderRadius: 6,
-                    background: selected ? '#f0f6ff' : undefined,
-                  }}
-                >
-                  <Checkbox checked={selected} />
-                  <span style={{ fontWeight: selected ? 600 : 400 }}>{d.deviceId} · {d.name}</span>
-                  <Tag color={status === '已启用' ? 'green' : status === '未配置' ? 'default' : 'blue'}>{status}</Tag>
-                </div>
-              );
+          <Space size={8} wrap style={{ marginBottom: 8 }}>
+            <Input
+              allowClear size="small" style={{ width: 220 }}
+              placeholder="搜索设备编号 / 名称 / 资产编码" value={devKw} onChange={(e) => setDevKw(e.target.value)}
+            />
+            <Select
+              size="small" style={{ width: 130 }} value={devBound}
+              onChange={(v) => setDevBound(v)}
+              options={[{ value: 'all', label: '绑定状态：全部' }, { value: 'unbound', label: '未绑定' }, { value: 'bound', label: '已绑定' }]}
+            />
+            <Select
+              size="small" style={{ width: 120 }} value={devType}
+              onChange={(v) => setDevType(v)}
+              options={[{ value: 'all', label: '类型：全部' }, ...deviceTypes.map((t) => ({ value: t, label: t }))]}
+            />
+          </Space>
+          <Table
+            rowKey="deviceId" size="small"
+            dataSource={deviceRows}
+            pagination={deviceRows.length > 8 ? { pageSize: 8, size: 'small' } : false}
+            onRow={(d) => ({
+              onClick: () => {
+                if (d.bound) {
+                  const b = boundOf(d.deviceId);
+                  message.warning(`设备 ${d.name} 已绑定（v${b.version}，${b.configStatus}），不能重复绑定：请关闭弹窗后使用列表中的「换绑」`);
+                  return;
+                }
+                setDeviceId(d.deviceId);
+                setValidateResult(null);
+              },
+              style: { cursor: d.bound ? 'not-allowed' : 'pointer' },
             })}
-          </div>
-          <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginBottom: 0 }}>
+            rowClassName={(d) => (d.deviceId === deviceId ? 'ant-table-row-selected' : '')}
+            columns={[
+              {
+                title: '', width: 40,
+                render: (_, d) => <Checkbox checked={d.deviceId === deviceId} disabled={d.bound} />,
+              },
+              { title: '设备编号', dataIndex: 'deviceId', width: 95 },
+              { title: '设备名称', dataIndex: 'name', width: 130 },
+              { title: '资产编码', dataIndex: 'assetCode', width: 115 },
+              { title: '类型', dataIndex: 'type', width: 95 },
+              { title: '型号', dataIndex: 'model', width: 95 },
+              { title: '车间 / 工位', width: 130, render: (_, d) => `${d.workshopName || '--'} / ${d.stationName || '--'}` },
+              { title: '设备负责人', dataIndex: 'owner', width: 95, render: (v) => v || '--' },
+              {
+                title: '是否已绑定指标', width: 130,
+                render: (_, d) => {
+                  const b = boundOf(d.deviceId);
+                  if (!b) return <Tag color="green">未绑定</Tag>;
+                  const srcCount = (b.items || []).filter((i) => i.enabled).length;
+                  const mCount = (b.items || []).reduce((s, i) => s + (i.metrics || []).filter((m) => m.selected).length, 0);
+                  return (
+                    <Tooltip title={`已绑定 ${srcCount} 个来源 / ${mCount} 项指标（v${b.version}，${b.configStatus}）：不能重复绑定，仅可在列表中「换绑」`}>
+                      <Tag color="blue" style={{ cursor: 'help' }}>已绑定 v{b.version}</Tag>
+                    </Tooltip>
+                  );
+                },
+              },
+            ]}
+          />
+          <Typography.Paragraph type="secondary" style={{ fontSize: 12, margin: '8px 0 0' }}>
             {deviceId
               ? <>已选 <b>{selectedDevice?.deviceId} · {selectedDevice?.name}</b>；点击「下一步」勾选 IoT 来源设备。</>
-              : '尚未选择设备：点击列表中一行选中设备。'}
+              : '尚未选择设备：点击列表中一行选中设备（仅未绑定设备可选）。'}
           </Typography.Paragraph>
         </>
       )}
