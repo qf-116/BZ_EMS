@@ -9,25 +9,27 @@
 // 已启用设备可「停用」（填原因）；换绑说明见页尾文案。
 // ============================================================
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
-  App, Alert, Button, Card, Checkbox, Col, Input, Modal, Row, Select, Space, Statistic, Table, Tag, Tooltip, Typography,
+  App, Alert, Button, Card, Checkbox, Col, Input, Modal, Row, Select, Space, Statistic, Steps, Table, Tag, Tooltip, Typography,
 } from 'antd';
-import { Plus, ShieldCheck, Save, Play, PauseCircle, Settings2, LayoutTemplate, Trash2 } from 'lucide-react';
+import { Plus, ShieldCheck, Save, Play, PauseCircle, Settings2, LayoutTemplate, Trash2, ArrowRight, ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import PageHeader from '../components/PageHeader.jsx';
 import StatusTag from '../components/StatusTag.jsx';
+import ApplyTemplateModal from '../components/ApplyTemplateModal.jsx';
 import { useDemoState, useDemoActions } from '../state/DemoStore.jsx';
 import { selectAllDevices, selectBindingDraft } from '../state/selectors.js';
 import { validateBindingDraft } from '../domain/binding.js';
 
 const metricTagColor = (m) => (m.syncStatus === '已失效' ? 'error' : 'default');
 
-// ---------- 绑定草稿弹窗（草稿状态全部来自 store，不经页面 useState） ----------
+// ---------- 绑定草稿弹窗（两步向导：第 1 步选数据源 → 第 2 步选指标；草稿状态全部来自 store，不经页面 useState） ----------
 function BindingDraftModal({ deviceId, deviceName, open, onClose }) {
   const state = useDemoState();
   const actions = useDemoActions();
   const { message } = App.useApp();
+  const [step, setStep] = useState(0);                        // 向导步骤：0=选择数据源，1=选择指标
   const [validateResult, setValidateResult] = useState(null); // UI 局部状态：仅展示校验结果
   const [sourceKw, setSourceKw] = useState('');               // 来源列表搜索（设备多时缓解弹窗拥挤）
   const [tplNameOpen, setTplNameOpen] = useState(false);      // 存为模板：命名小弹窗
@@ -43,6 +45,11 @@ function BindingDraftModal({ deviceId, deviceName, open, onClose }) {
   }, [sourceDevicesAll, sourceKw]);
   const currentVersion = state.entities.bindingsByDeviceId[deviceId]?.version || 0;
 
+  // 每次打开重置向导进度（换设备时同样重置）
+  useEffect(() => {
+    if (open) { setStep(0); setValidateResult(null); setSourceKw(''); }
+  }, [open, deviceId]);
+
   // 校验上下文：其它设备已启用绑定占用的 IoT 来源编码（全局排他）
   const occupiedCodes = useMemo(() => {
     const set = new Set();
@@ -56,6 +63,13 @@ function BindingDraftModal({ deviceId, deviceName, open, onClose }) {
 
   const draftItems = draft?.items || [];
   const metricCount = draftItems.reduce((s, i) => s + (i.metrics || []).filter((m) => m.selected).length, 0);
+  const hasMain = draftItems.some((i) => i.role === 'main');
+
+  const goNext = () => {
+    if (!draftItems.length) { message.warning('请先勾选至少 1 个 IoT 数据源'); return; }
+    setValidateResult(null);
+    setStep(1);
+  };
 
   const doValidate = () => {
     if (!draft) { message.warning('请先勾选 IoT 数据源，生成绑定草稿'); return; }
@@ -107,24 +121,37 @@ function BindingDraftModal({ deviceId, deviceName, open, onClose }) {
     setTplNameOpen(false);
   };
 
+  // 底部按钮按步骤切换：第 1 步「下一步」，第 2 步「校验 / 存为模板 / 保存」
+  const footer = step === 0 ? [
+    <Button key="cancel" onClick={onClose}>取消</Button>,
+    <Button key="next" type="primary" disabled={!draftItems.length} onClick={goNext}>
+      下一步：选择指标 <ArrowRight size={14} style={{ verticalAlign: '-2px' }} />
+    </Button>,
+  ] : [
+    <Button key="cancel" onClick={onClose}>取消</Button>,
+    <Button key="prev" icon={<ArrowLeft size={14} />} onClick={() => { setStep(0); setValidateResult(null); }}>上一步</Button>,
+    <Button key="tpl" icon={<LayoutTemplate size={14} />} disabled={!draftItems.length} onClick={() => { setTplName(`${deviceName || ''}绑定模板`); setTplNameOpen(true); }}>存为模板</Button>,
+    <Button key="validate" icon={<ShieldCheck size={14} />} onClick={doValidate}>校验</Button>,
+    <Button key="save" type="primary" icon={<Save size={14} />} onClick={doSave}>保存（生成待生效版本）</Button>,
+  ];
+
   return (
     <Modal
       title={<>绑定草稿 · {deviceName}（{deviceId}）<Tag style={{ marginLeft: 8 }}>新版本 v{currentVersion + 1}</Tag></>}
-      width={880}
+      width={1000}
       open={open}
       onCancel={onClose}
-      footer={[
-        <Button key="cancel" onClick={onClose}>取消</Button>,
-        <Button key="tpl" icon={<LayoutTemplate size={14} />} disabled={!draftItems.length} onClick={() => { setTplName(`${deviceName || ''}绑定模板`); setTplNameOpen(true); }}>存为模板</Button>,
-        <Button key="validate" icon={<ShieldCheck size={14} />} onClick={doValidate}>校验</Button>,
-        <Button key="save" type="primary" icon={<Save size={14} />} onClick={doSave}>保存（生成待生效版本）</Button>,
-      ]}
+      footer={footer}
     >
+      <Steps
+        size="small" current={step} style={{ marginBottom: 16, maxWidth: 560 }}
+        items={[{ title: '选择 IoT 数据源' }, { title: '选择指标' }]}
+      />
       <Alert
         type="info" showIcon style={{ marginBottom: 12 }}
         message="草稿仅保存在页面状态中（未保存不影响现有绑定）；保存后生成新版本，状态「待生效」，需再点「启用」才影响监测/报警/OEE/报表。"
       />
-      {validateResult && (
+      {validateResult && step === 1 && (
         validateResult.ok ? (
           <Alert type="success" showIcon style={{ marginBottom: 12 }} message="校验通过：恰好 1 个启用的主数据源、至少 1 项有效指标、IoT 来源编码无占用冲突。" />
         ) : (
@@ -140,88 +167,103 @@ function BindingDraftModal({ deviceId, deviceName, open, onClose }) {
         )
       )}
 
-      <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginBottom: 6 }}>
-        第 1 步 · 勾选 IoT 数据源（主设备必须恰好启用 1 个；IoT 来源编码全局唯一，被其它设备占用时校验不通过）
-      </Typography.Paragraph>
-      <Input
-        allowClear size="small" style={{ width: 260, marginBottom: 8 }}
-        placeholder="搜索来源编码 / 名称" value={sourceKw} onChange={(e) => setSourceKw(e.target.value)}
-      />
-      <div style={{ border: '1px solid #eef1f4', borderRadius: 6, padding: '8px 12px', marginBottom: 12, maxHeight: 180, overflow: 'auto' }}>
-        {sourceDevices.map((s) => {
-          const checked = draftItems.some((i) => i.iotDeviceId === s.iotDeviceId);
-          const occupied = occupiedCodes.has(s.iotDeviceCode);
-          return (
-            <div key={s.iotDeviceId} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '3px 0' }}>
-              <Checkbox
-                checked={checked}
-                onChange={(e) => {
-                  if (e.target.checked) {
-                    actions.addBindingSource(deviceId, {
-                      iotDeviceId: s.iotDeviceId,
-                      iotDeviceCode: s.iotDeviceCode,
-                      name: s.name,
-                      role: s.kind === '主设备' ? 'main' : 'sensor',
-                      sensorType: s.kind === '主设备' ? '--' : s.name,
-                      kind: s.kind,
-                      metrics: [],
-                    });
-                  } else {
-                    actions.removeBindingSource(deviceId, s.iotDeviceId);
-                  }
-                }}
-              >
-                {s.iotDeviceCode} · {s.name}
-              </Checkbox>
-              <Tag color={s.kind === '主设备' ? 'blue' : 'default'}>{s.kind}</Tag>
-              {occupied && <Tag color="warning">已被其它设备占用</Tag>}
-            </div>
-          );
-        })}
-      </div>
-
-      <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginBottom: 6 }}>
-        第 2 步 · 为每个已选数据源勾选指标（已失效指标「环境湿度 M.ambient_humidity」可点选，但校验不通过时会被拦截）
-      </Typography.Paragraph>
-      {draftItems.length === 0 && (
-        <div style={{ color: '#8a97a3', fontSize: 12, padding: '8px 0 4px' }}>尚未选择数据源：请先在上方勾选至少 1 个 IoT 主设备。</div>
-      )}
-      {draftItems.map((item) => (
-        <Card
-          key={item.iotDeviceId}
-          size="small"
-          style={{ marginBottom: 8 }}
-          title={(
-            <Space wrap>
-              <span>{item.iotDeviceCode} · {item.name || '--'}</span>
-              <Tag color={item.role === 'main' ? 'blue' : 'default'}>{item.role === 'main' ? '主设备' : '子传感器'}</Tag>
-              <a
-                onClick={() => { actions.removeBindingSource(deviceId, item.iotDeviceId); setValidateResult(null); }}
-                style={{ fontSize: 12 }}
-              >
-                移除
-              </a>
-            </Space>
-          )}
-          extra={<span style={{ fontSize: 12, color: '#8a97a3' }}>已选 {(item.metrics || []).filter((m) => m.selected).length} 项</span>}
-        >
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 4 }}>
-            {metrics.map((m) => {
-              const sel = (item.metrics || []).find((x) => x.metricCode === m.metricCode);
+      {step === 0 && (
+        <>
+          <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginBottom: 6 }}>
+            第 1 步 · 勾选 IoT 数据源（主设备必须恰好启用 1 个；IoT 来源编码全局唯一，被其它设备占用时校验不通过）
+          </Typography.Paragraph>
+          <Input
+            allowClear size="small" style={{ width: 260, marginBottom: 8 }}
+            placeholder="搜索来源编码 / 名称" value={sourceKw} onChange={(e) => setSourceKw(e.target.value)}
+          />
+          <div style={{ border: '1px solid #eef1f4', borderRadius: 6, padding: '8px 12px', marginBottom: 12, maxHeight: 320, overflow: 'auto' }}>
+            {sourceDevices.map((s) => {
+              const checked = draftItems.some((i) => i.iotDeviceId === s.iotDeviceId);
+              const occupied = occupiedCodes.has(s.iotDeviceCode);
               return (
-                <Checkbox
-                  key={m.metricCode}
-                  checked={!!sel?.selected}
-                  onChange={() => toggleMetric(item, m)}
-                >
-                  <span>{m.name}（{m.metricCode} · {m.metricVersion}）</span>
-                  {m.syncStatus === '已失效' && <Tag color={metricTagColor(m)} style={{ marginLeft: 6 }}>已失效</Tag>}
-                </Checkbox>
+                <div key={s.iotDeviceId} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0' }}>
+                  <Checkbox
+                    checked={checked}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        actions.addBindingSource(deviceId, {
+                          iotDeviceId: s.iotDeviceId,
+                          iotDeviceCode: s.iotDeviceCode,
+                          name: s.name,
+                          role: s.kind === '主设备' ? 'main' : 'sensor',
+                          sensorType: s.kind === '主设备' ? '--' : s.name,
+                          kind: s.kind,
+                          metrics: [],
+                        });
+                      } else {
+                        actions.removeBindingSource(deviceId, s.iotDeviceId);
+                      }
+                      setValidateResult(null);
+                    }}
+                  >
+                    {s.iotDeviceCode} · {s.name}
+                  </Checkbox>
+                  <Tag color={s.kind === '主设备' ? 'blue' : 'default'}>{s.kind}</Tag>
+                  {occupied && <Tag color="warning">已被其它设备占用</Tag>}
+                </div>
               );
             })}
           </div>
-        </Card>
-      ))}
+          <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginBottom: 0 }}>
+            已选 <b>{draftItems.length}</b> 个来源{draftItems.length > 0 && !hasMain && '，尚未勾选任何「主设备」——校验要求恰好 1 个主设备'}；点击「下一步」为各数据源选择指标。
+          </Typography.Paragraph>
+        </>
+      )}
+
+      {step === 1 && (
+        <>
+          <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginBottom: 6 }}>
+            第 2 步 · 为每个已选数据源勾选指标（已失效指标「环境湿度 M.ambient_humidity」可点选，但校验不通过时会被拦截）
+          </Typography.Paragraph>
+          {draftItems.length === 0 ? (
+            <div style={{ color: '#8a97a3', fontSize: 12, padding: '8px 0 4px' }}>
+              尚未选择数据源：请先「上一步」勾选至少 1 个 IoT 主设备。
+            </div>
+          ) : (
+            draftItems.map((item) => (
+              <Card
+                key={item.iotDeviceId}
+                size="small"
+                style={{ marginBottom: 8 }}
+                title={(
+                  <Space wrap>
+                    <span>{item.iotDeviceCode} · {item.name || '--'}</span>
+                    <Tag color={item.role === 'main' ? 'blue' : 'default'}>{item.role === 'main' ? '主设备' : '子传感器'}</Tag>
+                    <a
+                      onClick={() => { actions.removeBindingSource(deviceId, item.iotDeviceId); setValidateResult(null); }}
+                      style={{ fontSize: 12 }}
+                    >
+                      移除
+                    </a>
+                  </Space>
+                )}
+                extra={<span style={{ fontSize: 12, color: '#8a97a3' }}>已选 {(item.metrics || []).filter((m) => m.selected).length} 项</span>}
+              >
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 4 }}>
+                  {metrics.map((m) => {
+                    const sel = (item.metrics || []).find((x) => x.metricCode === m.metricCode);
+                    return (
+                      <Checkbox
+                        key={m.metricCode}
+                        checked={!!sel?.selected}
+                        onChange={() => toggleMetric(item, m)}
+                      >
+                        <span>{m.name}（{m.metricCode} · {m.metricVersion}）</span>
+                        {m.syncStatus === '已失效' && <Tag color={metricTagColor(m)} style={{ marginLeft: 6 }}>已失效</Tag>}
+                      </Checkbox>
+                    );
+                  })}
+                </div>
+              </Card>
+            ))
+          )}
+        </>
+      )}
 
       {/* 存为模板：命名后固化「来源结构 + 指标口径」，供批量应用到同型号设备 */}
       <Modal
@@ -242,82 +284,7 @@ function BindingDraftModal({ deviceId, deviceName, open, onClose }) {
   );
 }
 
-// ---------- 模板批量应用弹窗 ----------
-function ApplyTemplateModal({ open, initialTemplateId, onClose }) {
-  const state = useDemoState();
-  const actions = useDemoActions();
-  const { message } = App.useApp();
-  const [templateId, setTemplateId] = useState(null);
-  const [deviceIds, setDeviceIds] = useState([]);
-  const [autoEnable, setAutoEnable] = useState(true);
-
-  const templates = state.ui.bindingTemplates || [];
-  const effectiveTemplateId = open ? (initialTemplateId || templateId) : templateId;
-  const template = templates.find((t) => t.templateId === effectiveTemplateId) || null;
-  const metricCount = template ? template.items.reduce((s, i) => s + (i.metrics || []).filter((m) => m.selected).length, 0) : 0;
-
-  const deviceOptions = useMemo(() => selectAllDevices(state).map((d) => {
-    const b = state.entities.bindingsByDeviceId[d.deviceId];
-    return { value: d.deviceId, label: `${d.deviceId} · ${d.name}（${b?.configStatus || '未配置'}）` };
-  }), [state]);
-
-  const doApply = () => {
-    const res = actions.applyBindingTemplate({ deviceIds, template, autoEnable });
-    if (res.ok) {
-      message.success(res.message);
-      setDeviceIds([]);
-      onClose();
-    } else {
-      message.error(res.message);
-    }
-  };
-
-  return (
-    <Modal
-      title="模板应用到设备（批量）"
-      width={620}
-      open={open}
-      destroyOnClose
-      onCancel={onClose}
-      onOk={doApply}
-      okText={`应用到 ${deviceIds.length} 台设备`} cancelText="取消"
-      okButtonProps={{ disabled: !template || deviceIds.length === 0 }}
-    >
-      <Alert
-        type="info" showIcon style={{ marginBottom: 12 }}
-        message="同型号设备的联网配置通常一致：先在一台设备上配好并「存为模板」，再批量应用到其它设备。应用时由物联网平台按模板结构为每台设备自动分配专属 IoT 来源编码（演示模拟），不会与已占用编码冲突。"
-      />
-      <div style={{ marginBottom: 10 }}>
-        <div style={{ fontSize: 12, color: '#5d6b78', marginBottom: 4 }}>绑定模板</div>
-        <Select
-          style={{ width: '100%' }} placeholder="请选择绑定模板"
-          value={effectiveTemplateId || undefined}
-          onChange={(v) => setTemplateId(v)}
-          options={templates.map((t) => ({ value: t.templateId, label: `${t.name}（${t.items.length} 个来源 / ${t.items.reduce((s, i) => s + (i.metrics || []).filter((m) => m.selected).length, 0)} 项指标）` }))}
-          notFoundContent="暂无模板：请先在绑定草稿弹窗中「存为模板」"
-        />
-      </div>
-      <div style={{ marginBottom: 10 }}>
-        <div style={{ fontSize: 12, color: '#5d6b78', marginBottom: 4 }}>目标设备（可搜索多选，几十台上百台建议按型号分批应用）</div>
-        <Select
-          mode="multiple" showSearch optionFilterProp="label"
-          style={{ width: '100%' }} placeholder="请选择要应用模板的设备"
-          value={deviceIds} onChange={setDeviceIds}
-          options={deviceOptions}
-          maxTagCount="responsive"
-        />
-      </div>
-      <Checkbox checked={autoEnable} onChange={(e) => setAutoEnable(e.target.checked)}>
-        应用后立即启用（已启用设备应用模板视为换绑，生成新版本并直接生效）
-      </Checkbox>
-      {template && (
-        <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginTop: 10, marginBottom: 0 }}>
-          模板结构：{template.items.map((i) => `${i.kind === '主设备' ? '1 主设备' : `1 ${i.sensorType || '子传感器'}`}×${(i.metrics || []).filter((m) => m.selected).length} 指标`).join(' + ')}，共 {metricCount} 项有效指标。
-        </Typography.Paragraph>
-      )}
-    </Modal>
-  );
-}
+// 模板批量应用弹窗已抽为共享组件（components/ApplyTemplateModal.jsx），供本页与「绑定模板管理」页共用。
 
 // ---------- 停用弹窗（填原因） ----------
 function DisableBindingModal({ deviceId, deviceName, version, open, onClose }) {
@@ -365,15 +332,13 @@ function DisableBindingModal({ deviceId, deviceName, version, open, onClose }) {
 export default function BindingOverviewPage() {
   const state = useDemoState();
   const actions = useDemoActions();
-  const { message, modal } = App.useApp();
+  const { message } = App.useApp();
   const navigate = useNavigate();
 
   // UI 局部状态：弹窗开关
   const [draftTarget, setDraftTarget] = useState(null);   // { deviceId, deviceName }
   const [disableTarget, setDisableTarget] = useState(null); // { deviceId, deviceName, version }
   const [applyTarget, setApplyTarget] = useState(null);   // null=关闭；字符串=预选模板 id（''=不预选）
-
-  const templates = state.ui.bindingTemplates || [];
 
   const rows = useMemo(() => selectAllDevices(state).map((d) => {
     const binding = state.entities.bindingsByDeviceId[d.deviceId] || null;
@@ -438,65 +403,27 @@ export default function BindingOverviewPage() {
         <Col span={6}><Card size="small"><Statistic title="数据中断" value={interruptedCount} suffix="台" valueStyle={{ color: interruptedCount ? '#cf1322' : undefined }} /></Card></Col>
       </Row>
 
-      {/* 绑定模板：一次配置、批量应用——几十台上百台同型号设备不必逐台手配 */}
+      {/* 绑定模板已独立成「绑定模板管理」页；此处保留入口提示 + 批量应用快捷入口 */}
+      <Alert
+        type="info" showIcon icon={<LayoutTemplate size={14} />} style={{ marginBottom: 12 }}
+        message={(
+          <Space size={4} wrap>
+            <span>同型号设备可复用绑定模板批量联网：模板的新建 / 编辑 / 删除在「绑定模板管理」页维护。</span>
+            <a onClick={() => navigate('/binding-templates')}>前往绑定模板管理 →</a>
+          </Space>
+        )}
+      />
+
       <Card
         size="small" style={{ marginBottom: 12 }}
-        title={<Space size={6}><LayoutTemplate size={14} />绑定模板</Space>}
+        title="绑定状态列表（8 台设备）"
         extra={(
-          <Button size="small" type="primary" icon={<LayoutTemplate size={13} />} onClick={() => setApplyTarget('')}>
-            应用到设备
-          </Button>
+          <Space size={8}>
+            <Button size="small" icon={<LayoutTemplate size={13} />} onClick={() => setApplyTarget('')}>应用到设备</Button>
+            <Button type="primary" size="small" icon={<Plus size={13} />} onClick={() => { const t = rows.find((r) => r.status === '未配置') || rows[0]; setDraftTarget({ deviceId: t.device.deviceId, deviceName: t.device.name }); }}>新建绑定</Button>
+          </Space>
         )}
       >
-        {templates.length === 0 ? (
-          <div style={{ color: '#8a97a3', fontSize: 12 }}>
-            暂无模板：在任意设备的「新建/编辑绑定」弹窗中配置好来源与指标后点「存为模板」，即可批量应用到几十台上百台同型号设备（应用时自动分配各设备专属 IoT 来源编码）。
-          </div>
-        ) : (
-          <Table
-            rowKey="templateId" size="small" pagination={false}
-            dataSource={templates}
-            columns={[
-              { title: '模板名称', dataIndex: 'name', width: 240, render: (v) => <b>{v}</b> },
-              {
-                title: '来源结构', width: 220,
-                render: (_, t) => {
-                  const mains = t.items.filter((i) => i.role === 'main').length;
-                  const sensors = t.items.length - mains;
-                  return `1 主设备${sensors ? ` + ${sensors} 子传感器` : ''}`;
-                },
-              },
-              {
-                title: '指标数', width: 90,
-                render: (_, t) => `${t.items.reduce((s, i) => s + (i.metrics || []).filter((m) => m.selected).length, 0)} 项`,
-              },
-              { title: '来源设备', dataIndex: 'sourceName', width: 220, ellipsis: true, render: (v) => v || '--' },
-              { title: '创建时间', dataIndex: 'createdAt', width: 170 },
-              {
-                title: '操作', width: 170,
-                render: (_, t) => (
-                  <Space size={4}>
-                    <Button type="link" size="small" icon={<LayoutTemplate size={13} />} onClick={() => setApplyTarget(t.templateId)}>应用到设备</Button>
-                    <Button
-                      type="link" size="small" danger icon={<Trash2 size={13} />}
-                      onClick={() => modal.confirm({
-                        title: '删除绑定模板',
-                        content: `确定删除模板「${t.name}」吗？已应用过的设备绑定不受影响。`,
-                        okText: '删除', okButtonProps: { danger: true }, cancelText: '取消',
-                        onOk: () => { const r = actions.deleteBindingTemplate(t.templateId, t.name); r.ok ? message.success(r.message) : message.error(r.message); },
-                      })}
-                    >
-                      删除
-                    </Button>
-                  </Space>
-                ),
-              },
-            ]}
-          />
-        )}
-      </Card>
-
-      <Card size="small" style={{ marginBottom: 12 }} title="绑定状态列表（8 台设备）" extra={<Button type="primary" size="small" icon={<Plus size={13} />} onClick={() => { const t = rows.find((r) => r.status === '未配置') || rows[0]; setDraftTarget({ deviceId: t.device.deviceId, deviceName: t.device.name }); }}>新建绑定</Button>}>
         <Table
           rowKey={(r) => r.device.deviceId}
           size="small"

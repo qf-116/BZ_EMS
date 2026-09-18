@@ -138,10 +138,15 @@ export function reducer(state, action) {
       return finish(next, action, true, `指标 ${payload.metricCode} 选择状态已切换（未保存）`, {}, false, at);
     }
     case 'bindingTemplate/save': {
+      // 按 templateId upsert：新模板插入队首；同 id 视为编辑（保留原创建时间）
       const templates = state.ui.bindingTemplates || [];
-      const record = { ...payload.template, createdAt: at };
-      const next = { ...state, ui: { ...state.ui, bindingTemplates: [record, ...templates] } };
-      return finish(next, action, true, `绑定模板「${payload.template.name}」已保存（来源：${payload.template.sourceName || '--'}）`, { templateId: payload.template.templateId }, false, at);
+      const existing = templates.find(t => t.templateId === payload.template.templateId);
+      const record = { ...payload.template, createdAt: existing?.createdAt || at };
+      const next = {
+        ...state,
+        ui: { ...state.ui, bindingTemplates: existing ? templates.map(t => (t.templateId === record.templateId ? record : t)) : [record, ...templates] },
+      };
+      return finish(next, action, true, `绑定模板「${payload.template.name}」已${existing ? '更新' : '保存'}（来源：${payload.template.sourceName || '--'}）`, { templateId: payload.template.templateId }, false, at);
     }
     case 'bindingTemplate/delete': {
       const templates = (state.ui.bindingTemplates || []).filter(t => t.templateId !== payload.templateId);

@@ -5,7 +5,7 @@ import {
   Activity, AlarmClock, BookOpen, ClipboardList, DatabaseZap, FileBarChart,
   Gauge, LineChart, Settings2, Truck, Bell, CalendarClock,
   LayoutDashboard, Boxes, Wrench, Package,
-  GaugeCircle, LogOut, Layers,
+  GaugeCircle, LogOut, Layers, LayoutTemplate,
 } from 'lucide-react';
 import LoginPage from './pages/LoginPage.jsx';
 import WorkbenchPage from './pages/WorkbenchPage.jsx';
@@ -16,6 +16,7 @@ import DeviceLedgerDetailPage from './pages/DeviceLedgerDetailPage.jsx';
 import DocLibraryPage from './pages/DocLibraryPage.jsx';
 import BaseTypeConfigPage from './pages/BaseTypeConfigPage.jsx';
 import BindingOverviewPage from './pages/BindingOverviewPage.jsx';
+import BindingTemplatesPage from './pages/BindingTemplatesPage.jsx';
 import PlatformMetricsPage from './pages/PlatformMetricsPage.jsx';
 import AlarmCenterPage from './pages/AlarmCenterPage.jsx';
 import RuleConfigPage from './pages/RuleConfigPage.jsx';
@@ -141,6 +142,7 @@ const menus = [
   ] },
   { key: 'data', icon: <DatabaseZap size={15} />, label: '数据接入', children: [
     { key: '/binding-overview', icon: <DatabaseZap size={14} />, label: '联网配置总览' },
+    { key: '/binding-templates', icon: <LayoutTemplate size={14} />, label: '绑定模板管理' },
     { key: '/platform-metrics', icon: <BookOpen size={14} />, label: '平台指标清单' },
     { key: '/program-compare', icon: <BookOpen size={14} />, label: '程序参数比对' },
     { key: '/program-handle-record', icon: <ClipboardList size={14} />, label: '比对处理记录' },
@@ -352,6 +354,7 @@ export default function App() {
                   <Route path="/planned-downtime" element={<PlannedDowntimePage />} />
                   {/* 数据接入（V2.1：4 页 + 旧路由重定向） */}
                   <Route path="/binding-overview" element={<BindingOverviewPage />} />
+                  <Route path="/binding-templates" element={<BindingTemplatesPage />} />
                   <Route path="/platform-metrics" element={<PlatformMetricsPage />} />
                   <Route path="/program-compare" element={<ProgramComparePage />} />
                   <Route path="/program-handle-record" element={<ProgramHandleRecordPage />} />
