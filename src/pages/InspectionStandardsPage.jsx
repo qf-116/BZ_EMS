@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { Card, Table, Button, Space, Input, Select } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import PageHeader from '../components/PageHeader.jsx';
-import DataSourceBadge from '../components/DataSourceBadge.jsx';
 import DegradedBanner from '../components/DegradedBanner.jsx';
 import StatusTag from '../components/StatusTag.jsx';
 import EmptyState from '../components/EmptyState.jsx';
@@ -30,8 +29,7 @@ export default function InspectionStandardsPage() {
     <>
       <PageHeader
         title="点检标准"
-        subtitle={`点检标准档案 · 行点击进入标准详情（关联设备 / 关联项目）· 数据为演示快照（${meta.demoDay}）· 设备展示经 canonical 设备映射`}
-        actions={<DataSourceBadge meta={meta} />}
+        subtitle={`点检标准档案 · 行点击进入标准详情（关联设备 / 关联项目）· 数据更新于 ${meta.demoDay} · 设备展示经 canonical 设备映射`}
       />
       <DegradedBanner meta={meta} />
       <Card size="small" style={{ marginBottom: 12 }}>
@@ -48,7 +46,7 @@ export default function InspectionStandardsPage() {
           rowKey="code" size="small"
           dataSource={list}
           onRow={(r) => ({ onClick: () => navigate(`/inspection-standards/detail?code=${encodeURIComponent(r.code)}`), style: { cursor: 'pointer' } })}
-          locale={{ emptyText: <EmptyState description="暂无点检标准" reason={kw || status ? '当前筛选条件下没有点检标准' : '演示快照未包含点检标准'} /> }}
+          locale={{ emptyText: <EmptyState description="暂无点检标准" reason={kw || status ? '当前筛选条件下没有点检标准' : '暂无点检标准数据'} /> }}
           columns={[
             { title: '标准编号', dataIndex: 'code', width: 170, fixed: 'left' },
             { title: '标准名称', dataIndex: 'name', width: 200 },

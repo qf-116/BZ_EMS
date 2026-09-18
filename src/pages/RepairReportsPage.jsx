@@ -2,16 +2,18 @@ import React, { useMemo, useState } from 'react';
 import { Card, Table, Tag, Button, Space, Input, Select, App, Modal, Form, Alert } from 'antd';
 import { Plus } from 'lucide-react';
 import PageHeader from '../components/PageHeader.jsx';
-import DataSourceBadge from '../components/DataSourceBadge.jsx';
 import DegradedBanner from '../components/DegradedBanner.jsx';
 import StatusTag from '../components/StatusTag.jsx';
 import EmptyState from '../components/EmptyState.jsx';
 import { useDemoState, useDemoActions } from '../state/DemoStore.jsx';
 import { selectAllRepairReports, selectAllRepairOrders, selectAllDevices } from '../state/selectors.js';
 import { REPAIR_LEVELS, FAULT_TYPES, SLA_HOURS } from '../domain/repair.js';
+import { users } from '../data/demo/masterData.js';
 
 const levelColor = { 紧急: 'red', 严重: 'orange', 一般: 'blue' };
-const repairPersons = ['周强', '王强', '陈晨', '李四', '赵强'].map(v => ({ value: v, label: v }));
+// 维修人员下拉统一取自三方主数据（在职的维修工程师/设备负责人/点检员/巡检员/备件管理员）
+const repairStaff = users.filter(u => u.status === '在职' && (u.role === '维修工程师' || u.role === '设备负责人' || u.role === '点检员' || u.role === '巡检员' || u.role === '备件管理员')).map(u => u.name);
+const repairPersons = repairStaff.map(v => ({ value: v, label: v }));
 
 // 故障报修列表（store 驱动）：repairReports 全量 + 状态。
 // 新增为弹窗（createRepairReport 生成待派工报修与主工单）；指派任务为弹窗（生成工单后派工）。
@@ -100,10 +102,10 @@ export default function RepairReportsPage() {
   };
 
   const confirmCancel = () => {
-    message.info('演示未开放报修取消动作：报修单随主工单状态机推进（待派工 → 已派工 → 维修中 → 待验收 → 已完成），取消场景在维修工单侧处理');
+    message.info('报修单随主工单状态机推进（待派工 → 已派工 → 维修中 → 待验收 → 已完成），取消场景在维修工单侧处理');
   };
   const confirmDelete = () => {
-    message.info('演示不提供删除报修：报修记录为业务履历，删除动作不在本次演示范围');
+    message.info('报修记录为业务履历，不支持删除');
   };
 
   return (
@@ -111,7 +113,6 @@ export default function RepairReportsPage() {
       <PageHeader
         title="故障报修"
         subtitle={`报修记录派工后即形成维修任务 · 状态：${statusOptions.map(o => o.value).join('/') || '--'} · 派工在「待维修」或本页指派完成 · SLA 按等级自动带出（紧急 ${SLA_HOURS['紧急']}h / 严重 ${SLA_HOURS['严重']}h / 一般 ${SLA_HOURS['一般']}h）`}
-        actions={<DataSourceBadge meta={meta} />}
       />
       <DegradedBanner meta={meta} />
       <Card size="small" style={{ marginBottom: 12 }}>
@@ -122,15 +123,13 @@ export default function RepairReportsPage() {
           <Button onClick={() => { setKw(''); setStatus(null); }}>重置</Button>
         </Space>
       </Card>
-      <Card size="small" style={{ marginBottom: 12 }}>
-        <Space wrap>
+      <Card size="small">
+        <Space wrap style={{ marginBottom: 12 }}>
           <Button type="primary" icon={<Plus size={14} />} onClick={openModal}>新增</Button>
           <Button onClick={() => openAssign(null)}>指派任务</Button>
           <Button onClick={() => setCancelOpen(true)}>取消</Button>
           <Button danger onClick={confirmDelete}>删除</Button>
         </Space>
-      </Card>
-      <Card size="small">
         <Table
           rowKey="reportId" size="small" rowSelection={{ columnWidth: 40, selectedRowKeys: selectedKeys, onChange: setSelectedKeys }}
           dataSource={list}
@@ -186,7 +185,7 @@ export default function RepairReportsPage() {
           <Form.Item label="故障描述" name="desc" required rules={[{ required: true, message: '请输入故障描述' }]}>
             <Input.TextArea rows={3} placeholder="请输入故障描述（故障现象、影响范围等）" maxLength={500} showCount />
           </Form.Item>
-          <Form.Item label="故障时间" help="演示口径：报修时间以动作提交时刻为准（确定性演示时钟）">
+          <Form.Item label="故障时间" help="报修时间以提交时刻为准">
             <Input disabled value="提交时自动记录" />
           </Form.Item>
         </Form>
@@ -220,13 +219,13 @@ export default function RepairReportsPage() {
           <Form.Item label="维修班组" name="assigneeGroup">
             <Select placeholder="请选择" options={['机修班', '电气班', '工艺班'].map(v => ({ value: v, label: v }))} allowClear />
           </Form.Item>
-          <Form.Item label="指派说明" help="演示备注不落库；SLA 按故障等级自动计算">
+          <Form.Item label="指派说明" help="SLA 按故障等级自动计算">
             <Input.TextArea rows={2} placeholder="故障处理建议、备件领用、安全注意事项等" />
           </Form.Item>
         </Form>
       </Modal>
 
-      {/* 取消报修（弹窗）：演示范围提示 */}
+      {/* 取消报修（弹窗） */}
       <Modal
         title="取消报修"
         width={480}
@@ -235,8 +234,8 @@ export default function RepairReportsPage() {
         footer={<Button type="primary" onClick={() => setCancelOpen(false)}>知道了</Button>}
       >
         <Alert type="warning" showIcon
-          message="演示未开放报修取消动作"
-          description="报修单随维修主工单状态机推进（待派工 → 已派工 → 维修中 → 待验收 → 已完成 / 已取消）。如需终止维修，请在维修工单侧按状态机处理；本演示不提供直接取消报修的入口。" />
+          message="报修单不支持直接取消"
+          description="报修单随维修主工单状态机推进（待派工 → 已派工 → 维修中 → 待验收 → 已完成 / 已取消）。如需终止维修，请在维修工单侧按状态机处理。" />
       </Modal>
     </>
   );

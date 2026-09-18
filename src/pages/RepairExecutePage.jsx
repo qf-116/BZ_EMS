@@ -3,16 +3,18 @@ import { Card, Descriptions, Tag, Button, Space, Modal, Form, Select, Input, Inp
 import { ArrowLeft } from 'lucide-react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import PageHeader from '../components/PageHeader.jsx';
-import DataSourceBadge from '../components/DataSourceBadge.jsx';
 import DegradedBanner from '../components/DegradedBanner.jsx';
 import StatusTag from '../components/StatusTag.jsx';
 import EmptyState from '../components/EmptyState.jsx';
 import { useDemoState, useDemoActions } from '../state/DemoStore.jsx';
 import { selectRepairById, selectOutboundForRepair } from '../state/selectors.js';
 import { SLA_HOURS } from '../domain/repair.js';
+import { users } from '../data/demo/masterData.js';
 
 const levelColor = { 紧急: 'red', 严重: 'orange', 一般: 'blue' };
-const repairPersons = ['周强', '王强', '陈晨', '李四', '赵强'].map(v => ({ value: v, label: v }));
+// 维修人员下拉统一取自三方主数据（在职的维修工程师/设备负责人/点检员/巡检员/备件管理员）
+const repairStaff = users.filter(u => u.status === '在职' && (u.role === '维修工程师' || u.role === '设备负责人' || u.role === '点检员' || u.role === '巡检员' || u.role === '备件管理员')).map(u => u.name);
+const repairPersons = repairStaff.map(v => ({ value: v, label: v }));
 
 // 执行维修页（store 驱动）：/repair-orders/:repairOrderId/execute（兼容旧 query ?code=）。
 // 按 REPAIR_TRANSITIONS 渲染可执行操作：
@@ -96,7 +98,7 @@ export default function RepairExecutePage() {
       <PageHeader
         title="执行故障维修"
         subtitle={`维修工单：${order.code} · 来源：${order.source === 'alarm' ? '报警转维修' : order.source === 'report' ? '人工报修' : '报警+报修'} · 当前状态：${order.status}`}
-        actions={<Space><DataSourceBadge meta={meta} /><Button icon={<ArrowLeft size={14} />} onClick={() => navigate('/repair-orders')}>返回列表</Button></Space>}
+        actions={<Button icon={<ArrowLeft size={14} />} onClick={() => navigate('/repair-orders')}>返回列表</Button>}
       />
       <DegradedBanner meta={meta} />
 

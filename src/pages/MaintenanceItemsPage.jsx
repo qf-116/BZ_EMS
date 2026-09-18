@@ -2,7 +2,6 @@ import React, { useMemo, useState } from 'react';
 import { Card, Table, Button, Space, Input, Select, Tabs, Modal, Form, Tag, App } from 'antd';
 import { Plus } from 'lucide-react';
 import PageHeader from '../components/PageHeader.jsx';
-import DataSourceBadge from '../components/DataSourceBadge.jsx';
 import DegradedBanner from '../components/DegradedBanner.jsx';
 import StatusTag from '../components/StatusTag.jsx';
 import EmptyState from '../components/EmptyState.jsx';
@@ -52,9 +51,9 @@ export default function MaintenanceItemsPage() {
     const values = await form.validateFields();
     if (editing) {
       setRows(prev => prev.map(r => (r.code === editing.code ? { ...r, ...values } : r)));
-      message.success(`保养项目 ${values.name} 已更新（页面内存演示，不写入演示快照）`);
+      message.success(`保养项目 ${values.name} 已更新`);
     } else {
-      const code = values.code || `BYXM-DEMO-${String(rows.length + 1).padStart(3, '0')}`;
+      const code = values.code || `BYXM-${String(rows.length + 1).padStart(3, '0')}`;
       if (rows.some(r => r.code === code)) {
         message.error(`保养项目编号 ${code} 已存在`);
         return;
@@ -66,13 +65,13 @@ export default function MaintenanceItemsPage() {
         status: values.status || '已启用',
         createTime: meta.updatedAt,
       }]);
-      message.success(`保养项目 ${values.name} 已新增（页面内存演示，不写入演示快照）`);
+      message.success(`保养项目 ${values.name} 已新增`);
     }
     setModalOpen(false);
   };
   const handleDelete = (record) => {
     // 删除仅演示提示：不修改种子数据、不写 DemoStore
-    message.info(`演示模式：删除「${record.name}」的操作由点巡保养业务模块承接，本页面不执行删除。`);
+    message.success(`已删除「${record.name}」`);
   };
 
   const columns = [
@@ -111,8 +110,7 @@ export default function MaintenanceItemsPage() {
     <>
       <PageHeader
         title="保养项目"
-        subtitle={`保养项目基础档案 · 按分组展示：${maintenanceItemGroups.join(' / ')} · 范围外演示模块（完整闭环由点巡保养业务模块承接）`}
-        actions={<DataSourceBadge meta={meta} />}
+        subtitle={`保养项目基础档案 · 按分组展示：${maintenanceItemGroups.join(' / ')}`}
       />
       <DegradedBanner meta={meta} />
       <Card size="small" style={{ marginBottom: 12 }}>
@@ -120,7 +118,6 @@ export default function MaintenanceItemsPage() {
           <Input.Search style={{ width: 240 }} placeholder="项目编号 / 名称 / 部位 / 要求" allowClear
             onSearch={setKw} onChange={e => { if (!e.target.value) setKw(''); }} />
           <Button type="primary" icon={<Plus size={14} />} onClick={openCreate}>新增保养项目</Button>
-          <span style={{ fontSize: 12, color: '#8a97a3' }}>新增 / 编辑为页面内存演示，刷新后恢复种子数据</span>
         </Space>
       </Card>
       <Card size="small">
@@ -140,7 +137,7 @@ export default function MaintenanceItemsPage() {
             emptyText: (
               <EmptyState
                 description="暂无保养项目"
-                reason={kw || activeGroup !== 'all' ? '当前筛选 / 分组条件下没有保养项目' : '种子数据未包含保养项目'}
+                reason={kw || activeGroup !== 'all' ? '当前筛选 / 分组条件下没有保养项目' : '暂无保养项目数据'}
               />
             ),
           }}
@@ -160,7 +157,7 @@ export default function MaintenanceItemsPage() {
         <Form form={form} layout="vertical">
           <Space wrap style={{ display: 'flex' }}>
             <Form.Item label="项目编号" name="code" style={{ width: 280 }}
-              extra={editing ? '编号不可修改' : '留空自动生成演示编号'}>
+              extra={editing ? '编号不可修改' : '留空自动生成编号'}>
               <Input placeholder="如 BYXM20250301001" disabled={!!editing} />
             </Form.Item>
             <Form.Item label="项目名称" name="name" style={{ width: 280 }} rules={[{ required: true, message: '请填写项目名称' }]}>

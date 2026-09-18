@@ -42,7 +42,7 @@ const routes = [
   await page.goto(url, { waitUntil: 'load' });
   await page.waitForTimeout(1200);
   // 登录
-  const btn = await page.$('text=一键演示登录');
+  const btn = await page.$('text=一键登录');
   if (btn) { await btn.click(); await page.waitForTimeout(800); }
 
   let blank = 0;

@@ -2,7 +2,6 @@ import React, { useMemo, useState } from 'react';
 import { Card, Table, Button, Space, Input, Select, Tooltip } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import PageHeader from '../components/PageHeader.jsx';
-import DataSourceBadge from '../components/DataSourceBadge.jsx';
 import DegradedBanner from '../components/DegradedBanner.jsx';
 import StatusTag from '../components/StatusTag.jsx';
 import EmptyState from '../components/EmptyState.jsx';
@@ -54,8 +53,7 @@ export default function MaintenancePlansPage() {
     <>
       <PageHeader
         title="保养计划"
-        subtitle={`年度 / 循环保养计划 · 共 ${maintenancePlans.length} 条 · 行点击进入计划详情（关联设备 / 关联保养任务） · 范围外演示模块（完整闭环由点巡保养业务模块承接）`}
-        actions={<DataSourceBadge meta={meta} />}
+        subtitle={`年度 / 循环保养计划 · 共 ${maintenancePlans.length} 条 · 行点击进入计划详情（关联设备 / 关联保养任务）`}
       />
       <DegradedBanner meta={meta} />
       <Card size="small" style={{ marginBottom: 12 }}>
@@ -75,7 +73,7 @@ export default function MaintenancePlansPage() {
             emptyText: (
               <EmptyState
                 description="暂无保养计划"
-                reason={kw || status ? '当前筛选条件下没有保养计划' : '种子数据未包含保养计划'}
+                reason={kw || status ? '当前筛选条件下没有保养计划' : '暂无保养计划数据'}
               />
             ),
           }}
@@ -91,7 +89,7 @@ export default function MaintenancePlansPage() {
               title: '下次执行', width: 110, render: (_, r) => {
                 const v = nextExecOf(r);
                 return v === '--'
-                  ? <Tooltip title="该计划无待执行任务（已结束或种子数据未提供）">--</Tooltip>
+                  ? <Tooltip title="该计划暂无待执行任务">--</Tooltip>
                   : v;
               },
             },

@@ -3,14 +3,17 @@ import { Card, Descriptions, Tag, Button, Space, App, Alert, Table, Timeline, Ra
 import { ArrowLeft } from 'lucide-react';
 import { useNavigate, useParams, useSearchParams, useLocation } from 'react-router-dom';
 import PageHeader from '../components/PageHeader.jsx';
-import DataSourceBadge from '../components/DataSourceBadge.jsx';
 import DegradedBanner from '../components/DegradedBanner.jsx';
 import StatusTag from '../components/StatusTag.jsx';
 import EmptyState from '../components/EmptyState.jsx';
 import { useDemoState, useDemoActions } from '../state/DemoStore.jsx';
 import { selectRepairById, selectOutboundForRepair } from '../state/selectors.js';
+import { users } from '../data/demo/masterData.js';
 
 const levelColor = { 紧急: 'red', 严重: 'orange', 一般: 'blue' };
+// 维修人员下拉统一取自三方主数据（在职的维修工程师/设备负责人/点检员/巡检员/备件管理员）
+const repairStaff = users.filter(u => u.status === '在职' && (u.role === '维修工程师' || u.role === '设备负责人' || u.role === '点检员' || u.role === '巡检员' || u.role === '备件管理员')).map(u => u.name);
+const repairPersons = repairStaff.map(v => ({ value: v, label: v }));
 
 // 维修详情 / 验收页（store 驱动）：/repair-orders/:repairOrderId 与 /repair-orders/:repairOrderId/accept
 // 均渲染本页（兼容旧 query ?code=）。
@@ -97,7 +100,7 @@ export default function RepairDetailPage() {
       <PageHeader
         title="故障维修 · 详情"
         subtitle={`维修工单：${order.code} · 当前状态：${order.status}${isAcceptRoute && order.status === '待验收' ? ' · 验收模式' : ''}`}
-        actions={<Space><DataSourceBadge meta={meta} /><Button icon={<ArrowLeft size={14} />} onClick={() => navigate('/repair-orders')}>返回列表</Button></Space>}
+        actions={<Button icon={<ArrowLeft size={14} />} onClick={() => navigate('/repair-orders')}>返回列表</Button>}
       />
       <DegradedBanner meta={meta} />
 
@@ -253,7 +256,7 @@ export default function RepairDetailPage() {
         onCancel={() => setStartFormOpen(false)} onOk={doStartHere} okText="改派并开工" cancelText="取消">
         <Form form={startForm} layout="vertical">
           <Form.Item label="维修人员" name="assignee" required rules={[{ required: true, message: '派工必须指定维修人' }]}>
-            <Select placeholder="请选择维修人员" options={['周强', '王强', '陈晨', '李四', '赵强'].map(v => ({ value: v, label: v }))} />
+            <Select placeholder="请选择维修人员" options={repairPersons} />
           </Form.Item>
           <Form.Item label="维修班组" name="assigneeGroup">
             <Select placeholder="请选择" allowClear options={['机修班', '电气班', '工艺班'].map(v => ({ value: v, label: v }))} />

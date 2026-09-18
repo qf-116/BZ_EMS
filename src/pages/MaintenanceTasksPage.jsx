@@ -2,7 +2,6 @@ import React, { useMemo, useState } from 'react';
 import { Card, Table, Button, Space, Input, Select, Tooltip, Tag } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import PageHeader from '../components/PageHeader.jsx';
-import DataSourceBadge from '../components/DataSourceBadge.jsx';
 import DegradedBanner from '../components/DegradedBanner.jsx';
 import StatusTag from '../components/StatusTag.jsx';
 import EmptyState from '../components/EmptyState.jsx';
@@ -49,8 +48,7 @@ export default function MaintenanceTasksPage() {
     <>
       <PageHeader
         title="保养任务"
-        subtitle={`保养计划生成的执行任务 · 共 ${maintenanceTasks.length} 条 · 按计划时间正序 · 行点击进入详情 / 执行 · 范围外演示模块（完整闭环由点巡保养业务模块承接）`}
-        actions={<DataSourceBadge meta={meta} />}
+        subtitle={`保养计划生成的执行任务 · 共 ${maintenanceTasks.length} 条 · 按计划时间正序 · 行点击进入详情 / 执行`}
       />
       <DegradedBanner meta={meta} />
       <Card size="small" style={{ marginBottom: 12 }}>
@@ -70,7 +68,7 @@ export default function MaintenanceTasksPage() {
             emptyText: (
               <EmptyState
                 description="暂无保养任务"
-                reason={kw || status ? '当前筛选条件下没有保养任务' : '种子数据未包含保养任务'}
+                reason={kw || status ? '当前筛选条件下没有保养任务' : '暂无保养任务数据'}
               />
             ),
           }}

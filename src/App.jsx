@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
-import { Layout, Menu, Badge, Button, Drawer, Dropdown, Space } from 'antd';
+import { Routes, Route, Navigate, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { Layout, Menu, Badge, Button, Dropdown, Space } from 'antd';
 import {
   Activity, AlarmClock, BookOpen, ClipboardList, DatabaseZap, FileBarChart,
   Gauge, LineChart, Settings2, Truck, Bell, CalendarClock,
@@ -11,14 +11,12 @@ import LoginPage from './pages/LoginPage.jsx';
 import WorkbenchPage from './pages/WorkbenchPage.jsx';
 import OverviewPage from './pages/OverviewPage.jsx';
 import RealtimePage from './pages/RealtimePage.jsx';
-import DeviceDetailPage from './pages/DeviceDetailPage.jsx';
 import DeviceLedgerPage from './pages/DeviceLedgerPage.jsx';
 import DeviceLedgerDetailPage from './pages/DeviceLedgerDetailPage.jsx';
 import DocLibraryPage from './pages/DocLibraryPage.jsx';
 import BaseTypeConfigPage from './pages/BaseTypeConfigPage.jsx';
 import BindingOverviewPage from './pages/BindingOverviewPage.jsx';
 import PlatformMetricsPage from './pages/PlatformMetricsPage.jsx';
-import DeviceNetConfigPage from './pages/DeviceNetConfigPage.jsx';
 import AlarmCenterPage from './pages/AlarmCenterPage.jsx';
 import RuleConfigPage from './pages/RuleConfigPage.jsx';
 import AlarmRuleVersionPage from './pages/AlarmRuleVersionPage.jsx';
@@ -84,10 +82,20 @@ import RepairReportPage from './pages/RepairReportPage.jsx';
 import SparePartReportPage from './pages/SparePartReportPage.jsx';
 import MttrMtbfReportPage from './pages/MttrMtbfReportPage.jsx';
 import ComprehensiveReportPage from './pages/ComprehensiveReportPage.jsx';
-import DeviceScreenStandalone from './pages/DeviceScreenStandalone.jsx';
-import { specForPath } from './specs/pageSpecs.jsx';
 
 const { Sider, Content, Header } = Layout;
+
+// 设备详情统一为 /device-ledger/detail/:deviceId；旧监测详情路由重定向
+function DeviceDetailRedirect() {
+  const { deviceId } = useParams();
+  return <Navigate to={`/device-ledger/detail/${deviceId}`} replace />;
+}
+// 旧联网配置页并入详情页「联网配置」Tab，重定向并定位 Tab
+function NetConfigRedirect() {
+  const [sp] = useSearchParams();
+  const qs = sp.toString();
+  return <Navigate to={`/device-ledger/detail${qs ? `?${qs}&tab=network` : '?tab=network'}`} replace />;
+}
 
 // 菜单架构：白名单业务域 + 点检/保养/巡检演示模块（应需求恢复，作为范围外演示模块由点巡保养业务承接完整闭环）；
 // 系统管理（权限/审计）仍由宿主平台公共服务提供（§0.3/§0.4）。
@@ -179,7 +187,6 @@ export default function App() {
   });
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [specOpen, setSpecOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -196,10 +203,8 @@ export default function App() {
     return found ? [found.key] : [];
   }, [selectedKey]);
 
-  const spec = specForPath(location.pathname === '/monitor-overview' ? '/' : location.pathname);
-
-  // 监测大屏独立展示场景：始终在新标签页打开，不影响后台当前页
-  const openScreen = () => window.open(`${window.location.href.split('#')[0]}#/screen/device`, '_blank');
+  // 监测大屏：直接打开独立的大屏页面（public/ 下，构建后位于 dist/index.html 同级）
+  const openScreen = () => window.open('设备监测大屏演示.html', '_blank');
 
   const handleLogin = (u) => {
     localStorage.setItem('dms-user', JSON.stringify(u));
@@ -209,9 +214,6 @@ export default function App() {
     localStorage.removeItem('dms-user');
     setUser(null);
   };
-
-  // 监测大屏整页独立展示（新标签页）：不渲染后台菜单与登录信息，无需登录态
-  if (location.pathname.startsWith('/screen/')) return <DeviceScreenStandalone />;
 
   if (!user) return <LoginPage onLogin={handleLogin} />;
 
@@ -250,7 +252,7 @@ export default function App() {
             }}
           />
           <div className="app-sider-foot">
-            {mobileOpen ? '响应式演示' : '标准版 V1.0'}
+            标准版 V1.0
           </div>
         </Sider>
         <Layout>
@@ -276,11 +278,6 @@ export default function App() {
           </Header>
           <Content className="app-content">
             <main className="page-main">
-              <div className="spec-entry-row">
-                <Button icon={<BookOpen size={14} />} onClick={() => setSpecOpen(true)}>
-                  需求细则
-                </Button>
-              </div>
                 <Routes>
                   <Route path="/" element={<WorkbenchPage />} />
                   {/* 设备资产 */}
@@ -288,14 +285,15 @@ export default function App() {
                   <Route path="/device-ledger/detail/:deviceId" element={<DeviceLedgerDetailPage />} />
                   <Route path="/device-ledger/detail" element={<DeviceLedgerDetailPage />} />
                   <Route path="/device-ledger/edit" element={<DeviceLedgerPage />} />
-                  <Route path="/device-ledger/net-config" element={<DeviceNetConfigPage />} />
+                  {/* 旧联网配置页重定向到详情页「联网配置」Tab */}
+                  <Route path="/device-ledger/net-config" element={<NetConfigRedirect />} />
                   <Route path="/doc-library" element={<DocLibraryPage />} />
                   <Route path="/base-type-config" element={<BaseTypeConfigPage />} />
                   {/* 运行监测 */}
                   <Route path="/monitor-overview" element={<OverviewPage />} />
                   <Route path="/realtime" element={<RealtimePage />} />
-                  <Route path="/device/:deviceId" element={<DeviceDetailPage />} />
-                  {/* /screen/* 在函数顶部已提前返回独立大屏，不走后台布局 */}
+                  {/* 设备详情统一为台账详情页（联网/未联网设备内容自动区分）；/device/:id 重定向 */}
+                  <Route path="/device/:deviceId" element={<DeviceDetailRedirect />} />
                   {/* 报警中心 */}
                   <Route path="/alarm-center" element={<AlarmCenterPage />} />
                   <Route path="/alarm-rules" element={<RuleConfigPage />} />
@@ -388,20 +386,6 @@ export default function App() {
                   <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
             </main>
-            <Drawer
-              title={<div className="spec-title"><BookOpen size={16} /> 需求细则</div>}
-              placement="right"
-              width={480}
-              open={specOpen}
-              onClose={() => setSpecOpen(false)}
-              styles={{ body: { paddingTop: 0 } }}
-            >
-              <Badge status="processing" text={`当前页面：${spec.title}`} />
-              <div className="spec-body" style={{ marginTop: 12 }}>{spec.content}</div>
-              <div className="spec-note">
-                本面板面向开发说明，不进入生产 UI。
-              </div>
-            </Drawer>
           </Content>
         </Layout>
       </Layout>

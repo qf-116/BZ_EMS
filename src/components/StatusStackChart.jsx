@@ -12,8 +12,8 @@ export default function StatusStackChart({ data, xKey, height = 220, unit = '项
         <YAxis tick={{ fontSize: 10 }} allowDecimals={false} />
         <Tooltip formatter={v => `${v} ${unit}`} />
         <Legend wrapperStyle={{ fontSize: 12 }} />
-        <Bar dataKey="normal" name="正常" stackId="s" fill="#227b52" barSize={26} stroke="#fff" strokeWidth={1} />
-        <Bar dataKey="abnormal" name="异常" stackId="s" fill="#b45309" barSize={26} stroke="#fff" strokeWidth={1} radius={[3, 3, 0, 0]} />
+        <Bar dataKey="normal" name="正常" stackId="s" fill="#16a34a" barSize={26} stroke="#fff" strokeWidth={1} />
+        <Bar dataKey="abnormal" name="异常" stackId="s" fill="#d97706" barSize={26} stroke="#fff" strokeWidth={1} radius={[3, 3, 0, 0]} />
       </BarChart>
     </ResponsiveContainer>
   );

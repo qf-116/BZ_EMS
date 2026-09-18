@@ -1,11 +1,7 @@
 import React from 'react';
-import { Typography, Space, Tag } from 'antd';
-import { getProviderMode } from '../services/providerConfig.js';
+import { Typography, Space } from 'antd';
 
-export default function PageHeader({ title, subtitle, actions, source, updatedAt }) {
-  const dataSource = source || getProviderMode();
-  const sourceLabel = dataSource === 'api' ? '真实数据' : '演示数据';
-  const sourceColor = dataSource === 'api' ? 'success' : 'processing';
+export default function PageHeader({ title, subtitle, actions, updatedAt }) {
 
   return (
     <div className="page-head">
@@ -14,7 +10,6 @@ export default function PageHeader({ title, subtitle, actions, source, updatedAt
         {subtitle && <div className="page-sub">{subtitle}</div>}
       </div>
       <Space>
-        <Tag color={sourceColor}>{sourceLabel}</Tag>
         {updatedAt && <Typography.Text type="secondary" style={{ fontSize: 12 }}>更新于 {updatedAt}</Typography.Text>}
         {actions}
       </Space>

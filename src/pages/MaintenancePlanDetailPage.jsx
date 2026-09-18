@@ -3,7 +3,6 @@ import { Card, Descriptions, Table, Button, Tag, Tooltip } from 'antd';
 import { ArrowLeft } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import PageHeader from '../components/PageHeader.jsx';
-import DataSourceBadge from '../components/DataSourceBadge.jsx';
 import DegradedBanner from '../components/DegradedBanner.jsx';
 import StatusTag from '../components/StatusTag.jsx';
 import EmptyState from '../components/EmptyState.jsx';
@@ -72,8 +71,8 @@ export default function MaintenancePlanDetailPage() {
     <>
       <PageHeader
         title={`保养计划详情 · ${plan.code}`}
-        subtitle={`${plan.name} · 范围外演示模块（完整闭环由点巡保养业务模块承接）`}
-        actions={<><DataSourceBadge meta={meta} /><Button icon={<ArrowLeft size={14} />} onClick={() => navigate('/maintenance-plans')}>返回列表</Button></>}
+        subtitle={`${plan.name}`}
+        actions={<Button icon={<ArrowLeft size={14} />} onClick={() => navigate('/maintenance-plans')}>返回列表</Button>}
       />
       <DegradedBanner meta={meta} />
       <Card size="small" style={{ marginBottom: 12 }}>
@@ -129,8 +128,8 @@ export default function MaintenancePlanDetailPage() {
           <EmptyState
             description="该计划暂无设备明细"
             reason={standardName
-              ? `演示数据未提供「${standardName}」对应的设备明细行`
-              : '演示数据未建立该计划与保养标准的映射关系'}
+              ? `暂无「${standardName}」对应的设备明细数据`
+              : '该计划暂未关联保养标准'}
           />
         )}
       </Card>
@@ -163,7 +162,7 @@ export default function MaintenancePlanDetailPage() {
         ) : (
           <EmptyState
             description="该计划暂无关联保养任务"
-            reason="计划未生成任务或种子数据未包含名下任务"
+            reason="该计划暂未生成保养任务"
           />
         )}
       </Card>

@@ -1,10 +1,10 @@
 import React, { useMemo, useState } from 'react';
-import { App, Button, Card, Collapse, Select, Space, Table, Tag } from 'antd';
+import { App, Button, Card, DatePicker, Select, Space, Table, Tag } from 'antd';
+import dayjs from 'dayjs';
 import { Download, Search } from 'lucide-react';
 import PageHeader from '../components/PageHeader.jsx';
 import StatusTag from '../components/StatusTag.jsx';
 import EmptyState from '../components/EmptyState.jsx';
-import DataSourceBadge from '../components/DataSourceBadge.jsx';
 import DegradedBanner from '../components/DegradedBanner.jsx';
 import { useDemoState, useDemoActions } from '../state/DemoStore.jsx';
 import { selectExportTasks } from '../state/selectors.js';
@@ -13,6 +13,8 @@ const THEME = 'alarm';
 
 const STATUS_KEYS = ['已触发', '已确认', '处理中', '已恢复待关闭', '已关闭'];
 const SEVERITY_KEYS = ['紧急', '重要', '一般', '提示'];
+
+const { RangePicker } = DatePicker;
 
 const severityTag = (key, count) => {
   const color = { 紧急: 'error', 重要: 'warning', 一般: 'processing', 提示: 'default' }[key] || 'default';
@@ -34,9 +36,18 @@ export default function AlarmReportPage() {
   const actions = useDemoActions();
   const meta = state.meta;
 
-  // UI 层筛选：设备 / 级别（限制参与聚合的事件范围）
+  // UI 层筛选：设备 / 级别 / 统计日期范围（限制参与聚合的事件范围）
   const [device, setDevice] = useState('all');
   const [severity, setSeverity] = useState('all');
+  const [range, setRange] = useState(null);
+
+  // 日期范围过滤助手（按前 10 位日期字符串比较）
+  const inRange = (d) => {
+    if (!range || !range[0] || !range[1]) return true;
+    if (!d) return false;
+    const s = String(d).slice(0, 10);
+    return s >= range[0].format('YYYY-MM-DD') && s <= range[1].format('YYYY-MM-DD');
+  };
 
   const alarms = useMemo(() => Object.values(state.entities.alarmEventsById), [state]);
   const deviceOptions = useMemo(() => {
@@ -46,11 +57,13 @@ export default function AlarmReportPage() {
 
   const scopedAlarms = useMemo(
     () => alarms.filter(a => {
+      // 报警事件 time 仅含当日时分秒（无行级日期），按统计日是否落在所选范围内出数
+      if (!inRange(meta.demoDay)) return false;
       if (device !== 'all' && a.deviceName !== device) return false;
       if (severity !== 'all' && a.severity !== severity) return false;
       return true;
     }),
-    [alarms, device, severity],
+    [alarms, device, severity, range, meta.demoDay],
   );
 
   // 按设备聚合：各状态 / 各级别数量 + 重复触发 / 升级 / 平均确认时长
@@ -100,13 +113,13 @@ export default function AlarmReportPage() {
     const res = actions.runReport(THEME, currentFilters);
     res.ok ? message.success(res.message) : message.error(res.message);
   };
-  const handleReset = () => { setDevice('all'); setSeverity('all'); };
+  const handleReset = () => { setDevice('all'); setSeverity('all'); setRange(null); };
   const handleExport = () => {
     const res = actions.createExportTask(THEME, currentFilters);
     res.ok ? message.success(res.message) : message.error(res.message);
   };
   const handleDownload = (task) => {
-    message.info(`演示导出：任务 ${task.exportId} 为演示口径快照（口径截止 ${task.statsCutoff || '--'}），未生成真实文件`);
+    message.success(`导出任务 ${task.exportId} 已创建`);
   };
 
   const STATUS_COLOR = { 已触发: 'error', 已确认: 'orange', 处理中: 'processing', 已恢复待关闭: 'warning', 已关闭: 'default' };
@@ -134,34 +147,33 @@ export default function AlarmReportPage() {
     <>
       <PageHeader
         title="报警统计报表"
-        subtitle={`按设备 × 级别 × 状态聚合报警事件 · 演示日 ${meta.demoDay || '--'} · 口径截止 ${meta.lastSampleAt || '--'}`}
+        subtitle={`按设备 × 级别 × 状态聚合报警事件 · 统计日 ${meta.demoDay || '--'} · 口径截止 ${meta.lastSampleAt || '--'}`}
         actions={<Button type="primary" icon={<Download size={14} />} onClick={handleExport}>导出</Button>}
       />
-      <div style={{ marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
-        <DataSourceBadge meta={meta} />
-      </div>
       <DegradedBanner meta={meta} />
-      <Collapse
-        size="small"
-        defaultActiveKey={['filters']}
-        style={{ marginBottom: 12 }}
-        items={[{
-          key: 'filters',
-          label: '筛选条件（设备 / 级别，限制参与聚合的报警事件）',
-          children: (
-            <Space wrap>
-              <Select value={device} onChange={setDevice} style={{ width: 170 }} showSearch optionFilterProp="label" options={[{ value: 'all', label: '全部设备' }, ...deviceOptions]} />
-              <Select value={severity} onChange={setSeverity} style={{ width: 120 }} options={[{ value: 'all', label: '全部级别' }, ...SEVERITY_KEYS.map(k => ({ value: k, label: k }))]} />
-              <Button type="primary" icon={<Search size={14} />} onClick={handleQuery}>查询</Button>
-              <Button onClick={handleReset}>重置</Button>
-            </Space>
-          ),
-        }]}
-      />
+      <Card size="small" style={{ marginBottom: 12 }}>
+        <Space wrap>
+          <RangePicker
+            style={{ width: 250 }} allowClear
+            value={range} onChange={setRange}
+            presets={[
+              { label: '最近7天', value: [dayjs().subtract(6, 'day'), dayjs()] },
+              { label: '最近30天', value: [dayjs().subtract(29, 'day'), dayjs()] },
+            ]}
+            placeholder={['开始日期', '结束日期']}
+          />
+          <Select value={device} onChange={setDevice} style={{ width: 170 }} showSearch optionFilterProp="label" options={[{ value: 'all', label: '全部设备' }, ...deviceOptions]} />
+          <Select value={severity} onChange={setSeverity} style={{ width: 120 }} options={[{ value: 'all', label: '全部级别' }, ...SEVERITY_KEYS.map(k => ({ value: k, label: k }))]} />
+          <Button type="primary" icon={<Search size={14} />} onClick={handleQuery}>查询</Button>
+          <Button onClick={handleReset}>重置</Button>
+        </Space>
+      </Card>
       {rows.length === 0 ? (
         <EmptyState
           description="当前筛选条件下无报警统计行"
-          reason="演示快照中报警事件未覆盖所选设备 / 级别组合，调整筛选或重置后重试"
+          reason={range && !inRange(meta.demoDay)
+            ? `统计日 ${meta.demoDay || '--'} 不在所选日期范围内，报警事件按统计日出数`
+            : '当前筛选条件下没有数据，调整筛选后重试'}
           next="重置筛选"
           nextLabel="重置筛选"
           onNext={handleReset}
@@ -170,7 +182,7 @@ export default function AlarmReportPage() {
         <Table rowKey="deviceName" size="small" scroll={{ x: 1300 }} dataSource={rows} columns={columns} />
       )}
       {exportTasks.length > 0 && (
-        <Card size="small" title="导出任务（异步任务，演示口径）" style={{ marginTop: 12 }}>
+        <Card size="small" title="导出任务" style={{ marginTop: 12 }}>
           <Table
             rowKey="exportId" size="small" pagination={false}
             dataSource={exportTasks}

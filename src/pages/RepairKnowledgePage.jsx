@@ -20,7 +20,7 @@ export default function RepairKnowledgePage() {
         ? `确定删除维修经验「${record.name}」吗？删除后数据不可恢复。`
         : '确定删除选中的维修经验吗？删除后数据不可恢复。',
       okText: '删除', okButtonProps: { danger: true }, cancelText: '取消',
-      onOk: () => message.success('已删除选中维修经验（演示）'),
+      onOk: () => message.success('已删除选中维修经验'),
     });
   };
 
@@ -38,16 +38,14 @@ export default function RepairKnowledgePage() {
           <Button>重置</Button>
         </Space>
       </Card>
-      <Card size="small" style={{ marginBottom: 12 }}>
-        <Space wrap>
+      <Card size="small">
+        <Space wrap style={{ marginBottom: 12 }}>
           <Button type="primary" icon={<Plus size={14} />} onClick={() => openModal(null)}>新增</Button>
           <Button icon={<Pencil size={14} />} onClick={() => openModal(repairKnowledge[0])}>编辑</Button>
           <Button danger icon={<Trash2 size={14} />} onClick={() => confirmDelete(null)}>删除</Button>
-          <Button onClick={() => message.success('已启用选中项（演示）')}>启用</Button>
-          <Button onClick={() => message.info('已停用选中项（演示）')}>停用</Button>
+          <Button onClick={() => message.success('已启用选中项')}>启用</Button>
+          <Button onClick={() => message.info('已停用选中项')}>停用</Button>
         </Space>
-      </Card>
-      <Card size="small">
         <Table
           rowKey="code" size="small" rowSelection={{ columnWidth: 40 }}
           dataSource={repairKnowledge}
@@ -82,7 +80,7 @@ export default function RepairKnowledgePage() {
         open={modalOpen}
         destroyOnClose
         onCancel={() => setModalOpen(false)}
-        onOk={() => { setModalOpen(false); message.success('保存成功（演示）'); }}
+        onOk={() => { setModalOpen(false); message.success('保存成功'); }}
         okText="确认" cancelText="取消"
       >
         <Form labelCol={{ span: 6 }} wrapperCol={{ span: 16 }} initialValues={editing || {}}>

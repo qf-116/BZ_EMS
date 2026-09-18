@@ -1,9 +1,8 @@
 import React, { useMemo } from 'react';
-import { Card, Descriptions, Table, Button, Alert, Tag, Tooltip } from 'antd';
+import { Card, Descriptions, Table, Button, Tag, Tooltip } from 'antd';
 import { ArrowLeft } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import PageHeader from '../components/PageHeader.jsx';
-import DataSourceBadge from '../components/DataSourceBadge.jsx';
 import DegradedBanner from '../components/DegradedBanner.jsx';
 import StatusTag from '../components/StatusTag.jsx';
 import EmptyState from '../components/EmptyState.jsx';
@@ -18,7 +17,7 @@ function CanonicalDeviceCell({ code, seedName }) {
   const c = canonDevice(code);
   if (!c) return code || '--';
   return (
-    <Tooltip title={`canonical 设备映射：${c.deviceId} · 台账种子名称：${seedName || '--'}`}>
+    <Tooltip title={`canonical 设备映射：${c.deviceId} · 台账设备名称：${seedName || '--'}`}>
       <span>{c.name}（{code}）</span>
     </Tooltip>
   );
@@ -45,7 +44,7 @@ export default function PatrolTaskDetailPage() {
           actions={<Button icon={<ArrowLeft size={14} />} onClick={() => navigate('/patrol-tasks')}>返回列表</Button>}
         />
         <Card size="small">
-          <EmptyState description={`未找到巡检任务${id ? `（${id}）` : ''}`} reason="任务编号无效或该任务不在演示快照中" />
+          <EmptyState description={`未找到巡检任务${id ? `（${id}）` : ''}`} reason="任务编号无效或不存在该任务" />
         </Card>
       </>
     );
@@ -55,9 +54,8 @@ export default function PatrolTaskDetailPage() {
     <>
       <PageHeader
         title={`巡检任务详情 · ${task.code}`}
-        subtitle={`巡检线路（计划）：${task.plan || '--'} · 巡检日期 ${task.date || '--'} · 数据为演示快照（更新于 ${meta.updatedAt}）`}
+        subtitle={`巡检线路（计划）：${task.plan || '--'} · 巡检日期 ${task.date || '--'} · 数据更新于 ${meta.updatedAt}`}
         actions={<>
-          <DataSourceBadge meta={meta} />
           {canExecute && <Button type="primary" onClick={() => navigate(`/patrol-tasks/execute?id=${encodeURIComponent(task.code)}`)}>前往执行</Button>}
           <Button icon={<ArrowLeft size={14} />} onClick={() => navigate('/patrol-tasks')}>返回列表</Button>
         </>}
@@ -75,15 +73,11 @@ export default function PatrolTaskDetailPage() {
           <Descriptions.Item label="创建时间">{task.createTime || '--'}</Descriptions.Item>
         </Descriptions>
       </Card>
-      <Alert
-        type="info" showIcon style={{ marginBottom: 12 }}
-        message="演示快照口径：设备巡检明细为该巡检线路的设备行并集（覆盖多条任务的演示数据），请以任务编号口径对照查看。"
-      />
       <Card type="inner" size="small" title="设备巡检明细（canonical 映射）" style={{ marginBottom: 12 }}>
         <Table
           rowKey="code" size="small"
           dataSource={patrolTaskDetails}
-          locale={{ emptyText: <EmptyState description="暂无设备巡检明细" reason="演示快照中未包含该任务的明细行" /> }}
+          locale={{ emptyText: <EmptyState description="暂无设备巡检明细" reason="暂无对应的明细行数据" /> }}
           pagination={false}
           columns={[
             { title: '设备编号', dataIndex: 'code', width: 130, fixed: 'left' },
@@ -113,11 +107,11 @@ export default function PatrolTaskDetailPage() {
           scroll={{ x: 1400 }}
         />
       </Card>
-      <Card type="inner" size="small" title={<span>巡检项结果表 <Tag color="processing">演示口径：首台已巡检设备</Tag></span>}>
+      <Card type="inner" size="small" title={<span>巡检项结果表</span>}>
         <Table
           rowKey="code" size="small"
           dataSource={patrolExecItems}
-          locale={{ emptyText: <EmptyState description="暂无巡检项结果" reason="演示快照中未包含该任务的巡检项结果" /> }}
+          locale={{ emptyText: <EmptyState description="暂无巡检项结果" reason="暂无该任务的巡检项结果" /> }}
           pagination={false}
           columns={[
             { title: '项目编号', dataIndex: 'code', width: 120 },

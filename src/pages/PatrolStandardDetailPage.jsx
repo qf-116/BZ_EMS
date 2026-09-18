@@ -3,7 +3,6 @@ import { Card, Descriptions, Table, Button, Alert, Tag, Tooltip } from 'antd';
 import { ArrowLeft } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import PageHeader from '../components/PageHeader.jsx';
-import DataSourceBadge from '../components/DataSourceBadge.jsx';
 import DegradedBanner from '../components/DegradedBanner.jsx';
 import StatusTag from '../components/StatusTag.jsx';
 import EmptyState from '../components/EmptyState.jsx';
@@ -18,7 +17,7 @@ function CanonicalDeviceCell({ code, seedName }) {
   const c = canonDevice(code);
   if (!c) return code || '--';
   return (
-    <Tooltip title={`canonical 设备映射：${c.deviceId} · 台账种子名称：${seedName || '--'}`}>
+    <Tooltip title={`canonical 设备映射：${c.deviceId} · 台账设备名称：${seedName || '--'}`}>
       <span>{c.name}（{code}）</span>
     </Tooltip>
   );
@@ -53,7 +52,7 @@ export default function PatrolStandardDetailPage() {
           actions={<Button icon={<ArrowLeft size={14} />} onClick={() => navigate('/patrol-standards')}>返回列表</Button>}
         />
         <Card size="small">
-          <EmptyState description={`未找到巡检标准${id ? `（${id}）` : ''}`} reason="标准编号无效或该标准不在演示快照中" />
+          <EmptyState description={`未找到巡检标准${id ? `（${id}）` : ''}`} reason="标准编号无效或不存在该标准" />
         </Card>
       </>
     );
@@ -63,11 +62,8 @@ export default function PatrolStandardDetailPage() {
     <>
       <PageHeader
         title={`巡检标准详情 · ${standard.name}`}
-        subtitle={`标准编号 ${standard.code} · 巡检线路即标准覆盖的设备检查线路 · 数据为演示快照（更新于 ${standard.updateTime || meta.updatedAt}）`}
-        actions={<>
-          <DataSourceBadge meta={meta} />
-          <Button icon={<ArrowLeft size={14} />} onClick={() => navigate('/patrol-standards')}>返回列表</Button>
-        </>}
+        subtitle={`标准编号 ${standard.code} · 巡检线路即标准覆盖的设备检查线路 · 数据更新于 ${standard.updateTime || meta.updatedAt}`}
+        actions={<Button icon={<ArrowLeft size={14} />} onClick={() => navigate('/patrol-standards')}>返回列表</Button>}
       />
       <DegradedBanner meta={meta} />
       <Card size="small" style={{ marginBottom: 12 }}>
@@ -81,17 +77,11 @@ export default function PatrolStandardDetailPage() {
           <Descriptions.Item label="备注" span={3}>{standard.remark || '--'}</Descriptions.Item>
         </Descriptions>
       </Card>
-      {standard.devices !== lineDevices.length && (
-        <Alert
-          type="info" showIcon style={{ marginBottom: 12 }}
-          message={`演示快照口径：巡检线路设备快照含 ${lineDevices.length} 台（档案设备数 ${standard.devices} 台），快照为各巡检线路设备并集，仅供对照。`}
-        />
-      )}
       <Card type="inner" size="small" title="巡检线路设备（canonical 映射）" style={{ marginBottom: 12 }}>
         <Table
           rowKey="code" size="small" pagination={false}
           dataSource={lineDevices}
-          locale={{ emptyText: <EmptyState description="该标准暂无巡检线路设备" reason="演示快照中未包含该线路的设备行" /> }}
+          locale={{ emptyText: <EmptyState description="该标准暂无巡检线路设备" reason="暂无对应的设备行数据" /> }}
           columns={[
             { title: '设备编号', dataIndex: 'code', width: 130 },
             {
@@ -108,16 +98,16 @@ export default function PatrolStandardDetailPage() {
       </Card>
       <Card
         type="inner" size="small"
-        title={<span>巡检项目清单 <Tag color="processing">演示口径</Tag></span>}
+        title={<span>巡检项目清单</span>}
       >
         <Alert
           type="info" showIcon style={{ marginBottom: 8 }}
-          message="演示快照未包含「标准—项目」关联明细，以下为巡检项目基础档案（已启用）清单，仅供演示。"
+          message="未包含「标准—项目」关联明细，以下为巡检项目基础档案（已启用）清单。"
         />
         <Table
           rowKey="code" size="small" pagination={false}
           dataSource={items}
-          locale={{ emptyText: <EmptyState description="暂无巡检项目" reason="演示快照中无已启用的巡检项目" /> }}
+          locale={{ emptyText: <EmptyState description="暂无巡检项目" reason="暂无已启用的巡检项目" /> }}
           columns={[
             { title: '项目编号', dataIndex: 'code', width: 180 },
             { title: '项目名称', dataIndex: 'name', width: 150 },

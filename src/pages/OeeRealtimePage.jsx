@@ -8,7 +8,6 @@ import {
 } from '../state/selectors.js';
 import PageHeader from '../components/PageHeader.jsx';
 import MetricTile from '../components/MetricTile.jsx';
-import DataSourceBadge from '../components/DataSourceBadge.jsx';
 import DegradedBanner from '../components/DegradedBanner.jsx';
 
 // 实时 OEE：全部数字由 selectOeeRealtimeRows 派生，页面不写死任何 OEE 值。
@@ -90,16 +89,13 @@ export default function OeeRealtimePage() {
 
   return (
     <>
-      <div style={{ marginBottom: 8 }}>
-        <DataSourceBadge meta={state.meta} />
-      </div>
       <DegradedBanner meta={state.meta} />
       <PageHeader
         title="实时 OEE"
-        subtitle={`统计窗口：最近 1 小时（演示日 ${state.meta.demoDay}）· OEE = 可用率 × 性能率 × 合格率 · 可用率 = 运行时间 / (负荷时间 − 计划停机时间) · 性能率 = 实际速度 / 理想速度 · 合格率 = 良品 / 总产量 · “--”表示不可计算（悬停查看原因），不按 0 处理`}
+        subtitle={`统计窗口：最近 1 小时（统计日 ${state.meta.demoDay}）· OEE = 可用率 × 性能率 × 合格率 · 可用率 = 运行时间 / (负荷时间 − 计划停机时间) · 性能率 = 实际速度 / 理想速度 · 合格率 = 良品 / 总产量 · “--”表示不可计算（悬停查看原因），不按 0 处理`}
       />
       <div className="metric-grid" style={{ marginBottom: 12 }}>
-        <MetricTile label="平均 OEE（可计算设备）" value={avgOf('oee')} unit="%" color="#0e5a74" />
+        <MetricTile label="平均 OEE（可计算设备）" value={avgOf('oee')} unit="%" color="#1668dc" />
         <MetricTile label="平均可用率" value={avgOf('availability')} unit="%" color="#389e0d" />
         <MetricTile label="平均性能率" value={avgOf('performance')} unit="%" color="#d46b08" />
         <MetricTile label="平均合格率" value={avgOf('quality')} unit="%" color="#5d6b78" />

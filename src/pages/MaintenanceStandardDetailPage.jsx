@@ -3,7 +3,6 @@ import { Card, Descriptions, Table, Button, Tag, Typography } from 'antd';
 import { ArrowLeft } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import PageHeader from '../components/PageHeader.jsx';
-import DataSourceBadge from '../components/DataSourceBadge.jsx';
 import DegradedBanner from '../components/DegradedBanner.jsx';
 import StatusTag from '../components/StatusTag.jsx';
 import EmptyState from '../components/EmptyState.jsx';
@@ -72,8 +71,8 @@ export default function MaintenanceStandardDetailPage() {
     <>
       <PageHeader
         title={`保养标准详情 · ${standard.code}`}
-        subtitle={`${standard.name} · 范围外演示模块（完整闭环由点巡保养业务模块承接）`}
-        actions={<><DataSourceBadge meta={meta} /><Button icon={<ArrowLeft size={14} />} onClick={() => navigate('/maintenance-standards')}>返回列表</Button></>}
+        subtitle={`${standard.name}`}
+        actions={<Button icon={<ArrowLeft size={14} />} onClick={() => navigate('/maintenance-standards')}>返回列表</Button>}
       />
       <DegradedBanner meta={meta} />
       <Card size="small" style={{ marginBottom: 12 }}>
@@ -111,13 +110,13 @@ export default function MaintenanceStandardDetailPage() {
               { title: '设备类型', dataIndex: 'type', width: 100, render: v => dash(v) },
               { title: '所属部门', dataIndex: 'dept', width: 170, render: v => dash(v) },
               { title: '工位', dataIndex: 'station', width: 100, render: v => dash(v) },
-              { title: '台账状态', dataIndex: 'state', width: 100, render: v => <StatusTag value={v} tip="台账生命周期状态（演示种子口径）" /> },
+              { title: '台账状态', dataIndex: 'state', width: 100, render: v => <StatusTag value={v} tip="台账生命周期状态" /> },
             ]}
           />
         ) : (
           <EmptyState
             description="该标准暂无关联设备明细"
-            reason={`演示数据仅提供「${CANONICAL_STANDARD_CODE} 数控车床月度保养标准」的关联设备清单，其余标准由点巡保养业务模块维护`}
+            reason="暂无关联设备数据"
           />
         )}
       </Card>
@@ -139,14 +138,14 @@ export default function MaintenanceStandardDetailPage() {
         ) : (
           <EmptyState
             description="该标准暂无关联保养项目明细"
-            reason={`演示数据仅提供「${CANONICAL_STANDARD_CODE}」的关联项目清单（${maintenanceStandardItemCodes.length} 项），其余标准由点巡保养业务模块维护`}
+            reason="暂无关联保养项目数据"
           />
         )}
       </Card>
 
       <div style={{ textAlign: 'right' }}>
         <Typography.Text type="secondary" style={{ fontSize: 12, marginRight: 12 }}>
-          标准详情只读展示 · 新增 / 停用等维护动作由点巡保养业务模块承接
+          标准详情只读展示
         </Typography.Text>
         <Button type="primary" onClick={() => navigate('/maintenance-standards')}>关闭</Button>
       </div>

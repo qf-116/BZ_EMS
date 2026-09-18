@@ -2,7 +2,6 @@ import React, { useMemo, useState } from 'react';
 import { Card, Table, Button, Space, Input, Select } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import PageHeader from '../components/PageHeader.jsx';
-import DataSourceBadge from '../components/DataSourceBadge.jsx';
 import DegradedBanner from '../components/DegradedBanner.jsx';
 import StatusTag from '../components/StatusTag.jsx';
 import EmptyState from '../components/EmptyState.jsx';
@@ -61,8 +60,7 @@ export default function PatrolTasksPage() {
     <>
       <PageHeader
         title="巡检任务"
-        subtitle={`巡检任务（按巡检计划生成，任务状态：${[...new Set(patrolTasks.map(r => r.status))].join('/')}）· 行点击进入详情 · 数据为演示快照（更新于 ${meta.updatedAt}）`}
-        actions={<DataSourceBadge meta={meta} />}
+        subtitle={`巡检任务（按巡检计划生成，任务状态：${[...new Set(patrolTasks.map(r => r.status))].join('/')}）· 行点击进入详情 · 数据更新于 ${meta.updatedAt}`}
       />
       <DegradedBanner meta={meta} />
       <Card size="small" style={{ marginBottom: 12 }}>
@@ -77,7 +75,7 @@ export default function PatrolTasksPage() {
         <Table
           rowKey="code" size="small" columns={columns} dataSource={list} scroll={{ x: 1350 }}
           onRow={(r) => ({ onClick: () => navigate(`/patrol-tasks/detail?id=${encodeURIComponent(r.code)}`), style: { cursor: 'pointer' } })}
-          locale={{ emptyText: <EmptyState description="暂无巡检任务" reason={kw || status ? '当前筛选条件下没有巡检任务' : '演示快照中无巡检任务数据'} /> }}
+          locale={{ emptyText: <EmptyState description="暂无巡检任务" reason={kw || status ? '当前筛选条件下没有巡检任务' : '暂无巡检任务数据'} /> }}
           pagination={{ pageSize: 10, showTotal: t => `共 ${t} 条` }}
         />
       </Card>

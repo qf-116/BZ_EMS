@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { Card, Table, Button, Space, Input, Select, Progress } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import PageHeader from '../components/PageHeader.jsx';
-import DataSourceBadge from '../components/DataSourceBadge.jsx';
 import DegradedBanner from '../components/DegradedBanner.jsx';
 import StatusTag from '../components/StatusTag.jsx';
 import EmptyState from '../components/EmptyState.jsx';
@@ -28,8 +27,7 @@ export default function InspectionPlansPage() {
     <>
       <PageHeader
         title="点检计划"
-        subtitle={`点检计划档案 · 周期（日/周/月/自定义）+ 间隔 + 跳过规则 · 数据为演示快照（${meta.demoDay}）· 完整闭环由点巡保养业务模块承接`}
-        actions={<DataSourceBadge meta={meta} />}
+        subtitle={`点检计划档案 · 周期（日/周/月/自定义）+ 间隔 + 跳过规则 · 数据更新于 ${meta.demoDay}`}
       />
       <DegradedBanner meta={meta} />
       <Card size="small" style={{ marginBottom: 12 }}>
@@ -45,7 +43,7 @@ export default function InspectionPlansPage() {
           rowKey="code" size="small"
           dataSource={list}
           onRow={(r) => ({ onClick: () => navigate(`/inspection-plans/detail?code=${encodeURIComponent(r.code)}`), style: { cursor: 'pointer' } })}
-          locale={{ emptyText: <EmptyState description="暂无点检计划" reason={kw || status ? '当前筛选条件下没有点检计划' : '演示快照未包含点检计划'} /> }}
+          locale={{ emptyText: <EmptyState description="暂无点检计划" reason={kw || status ? '当前筛选条件下没有点检计划' : '暂无点检计划数据'} /> }}
           columns={[
             { title: '计划编号', dataIndex: 'code', width: 170, fixed: 'left' },
             { title: '计划名称', dataIndex: 'name', width: 200 },

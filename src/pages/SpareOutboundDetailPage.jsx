@@ -3,7 +3,6 @@ import { Card, Descriptions, Table, Button, Empty } from 'antd';
 import { ArrowLeft } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import PageHeader from '../components/PageHeader.jsx';
-import DataSourceBadge from '../components/DataSourceBadge.jsx';
 import DegradedBanner from '../components/DegradedBanner.jsx';
 import EmptyState from '../components/EmptyState.jsx';
 import { useDemoState } from '../state/DemoStore.jsx';
@@ -47,7 +46,7 @@ export default function SpareOutboundDetailPage() {
       <PageHeader
         title={`出库详情 · ${detail.code}`}
         subtitle="维修出库单由维修领料动作生成，与维修工单关联；退库回冲原出库仓库在库量"
-        actions={<><DataSourceBadge meta={state.meta} /><Button icon={<ArrowLeft size={14} />} onClick={() => navigate('/spare-parts-outbound')}>返回列表</Button></>}
+        actions={<Button icon={<ArrowLeft size={14} />} onClick={() => navigate('/spare-parts-outbound')}>返回列表</Button>}
       />
       <DegradedBanner meta={state.meta} />
       <Card size="small" style={{ marginBottom: 12 }}>

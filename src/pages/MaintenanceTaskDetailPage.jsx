@@ -3,7 +3,6 @@ import { Card, Descriptions, Table, Button, Tag, Tooltip, Alert } from 'antd';
 import { ArrowLeft } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import PageHeader from '../components/PageHeader.jsx';
-import DataSourceBadge from '../components/DataSourceBadge.jsx';
 import DegradedBanner from '../components/DegradedBanner.jsx';
 import StatusTag from '../components/StatusTag.jsx';
 import EmptyState from '../components/EmptyState.jsx';
@@ -27,10 +26,10 @@ function parseAssetCode(deviceStr) {
 // 保养项结果口径（种子推导，不伪造执行记录）：
 // 任务明细行有 skipReason → 已跳过；checked ≥ 项目序位 → 已完成（执行时间取明细行 execTime）；否则未执行。
 function resultOfItem(itemIndex, detailRow) {
-  if (!detailRow) return { label: '--', tip: '演示数据未提供该任务的保养明细' };
+  if (!detailRow) return { label: '--', tip: '暂无该任务的保养明细' };
   if (detailRow.skipReason) return { label: '已跳过', tip: detailRow.skipReason };
   if ((detailRow.checked || 0) >= itemIndex + 1) return { label: '已完成', tip: `执行时间：${detailRow.execTime || '--'}` };
-  return { label: '未执行', tip: '保养项未执行（演示种子口径）' };
+  return { label: '未执行', tip: '保养项未执行' };
 }
 
 // 保养任务详情（范围外演示模块，只读）：/maintenance-tasks/detail?code=（兼容 ?id=）。
@@ -81,14 +80,14 @@ export default function MaintenanceTaskDetailPage() {
     <>
       <PageHeader
         title={`保养任务详情 · ${task.code}`}
-        subtitle={`${task.name} · 范围外演示模块（完整闭环由点巡保养业务模块承接）`}
-        actions={<><DataSourceBadge meta={meta} /><Button icon={<ArrowLeft size={14} />} onClick={() => navigate('/maintenance-tasks')}>返回列表</Button></>}
+        subtitle={`${task.name}`}
+        actions={<Button icon={<ArrowLeft size={14} />} onClick={() => navigate('/maintenance-tasks')}>返回列表</Button>}
       />
       <DegradedBanner meta={meta} />
       {canExecute && (
         <Alert
           type="info" showIcon style={{ marginBottom: 12 }}
-          message={`该任务当前状态「${task.status}」，可前往执行页逐项登记保养结果（页面内存演示，不写入演示快照）`}
+          message={`该任务当前状态「${task.status}」，可前往执行页逐项登记保养结果`}
           action={
             <Button size="small" type="primary" onClick={() => navigate(`/maintenance-tasks/execute?code=${encodeURIComponent(task.code)}`)}>前往执行</Button>
           }
@@ -119,7 +118,7 @@ export default function MaintenanceTaskDetailPage() {
       </Card>
 
       {detailRow && (
-        <Card type="inner" size="small" title="任务执行汇总（种子明细）" style={{ marginBottom: 12 }}>
+        <Card type="inner" size="small" title="任务执行汇总" style={{ marginBottom: 12 }}>
           <Descriptions column={3} size="small">
             <Descriptions.Item label="保养项目数">{dash(detailRow.itemCount)}</Descriptions.Item>
             <Descriptions.Item label="已执行">{dash(detailRow.checked)}</Descriptions.Item>
@@ -135,7 +134,7 @@ export default function MaintenanceTaskDetailPage() {
           rowKey="key" size="small" pagination={false}
           dataSource={resultRows}
           locale={{
-            emptyText: <EmptyState description="暂无保养项目" reason="种子数据未包含该任务的保养项目" />,
+            emptyText: <EmptyState description="暂无保养项目" reason="暂无该任务的保养项目数据" />,
           }}
           columns={[
             { title: '项目编号', dataIndex: 'code', width: 160 },

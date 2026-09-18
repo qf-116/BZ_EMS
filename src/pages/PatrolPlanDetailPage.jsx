@@ -1,9 +1,8 @@
 import React, { useMemo } from 'react';
-import { Card, Descriptions, Table, Button, Alert, Tooltip } from 'antd';
+import { Card, Descriptions, Table, Button, Tooltip } from 'antd';
 import { ArrowLeft } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import PageHeader from '../components/PageHeader.jsx';
-import DataSourceBadge from '../components/DataSourceBadge.jsx';
 import DegradedBanner from '../components/DegradedBanner.jsx';
 import StatusTag from '../components/StatusTag.jsx';
 import EmptyState from '../components/EmptyState.jsx';
@@ -18,7 +17,7 @@ function CanonicalDeviceCell({ code, seedName }) {
   const c = canonDevice(code);
   if (!c) return code || '--';
   return (
-    <Tooltip title={`canonical 设备映射：${c.deviceId} · 台账种子名称：${seedName || '--'}`}>
+    <Tooltip title={`canonical 设备映射：${c.deviceId} · 台账设备名称：${seedName || '--'}`}>
       <span>{c.name}（{code}）</span>
     </Tooltip>
   );
@@ -58,7 +57,7 @@ export default function PatrolPlanDetailPage() {
           actions={<Button icon={<ArrowLeft size={14} />} onClick={() => navigate('/patrol-plans')}>返回列表</Button>}
         />
         <Card size="small">
-          <EmptyState description={`未找到巡检计划${id ? `（${id}）` : ''}`} reason="计划编号无效或该计划不在演示快照中" />
+          <EmptyState description={`未找到巡检计划${id ? `（${id}）` : ''}`} reason="计划编号无效或不存在该计划" />
         </Card>
       </>
     );
@@ -70,11 +69,8 @@ export default function PatrolPlanDetailPage() {
     <>
       <PageHeader
         title={`巡检计划详情 · ${plan.name}`}
-        subtitle={`计划编号 ${plan.code} · 数据为演示快照（更新于 ${meta.updatedAt}）`}
-        actions={<>
-          <DataSourceBadge meta={meta} />
-          <Button icon={<ArrowLeft size={14} />} onClick={() => navigate('/patrol-plans')}>返回列表</Button>
-        </>}
+        subtitle={`计划编号 ${plan.code} · 数据更新于 ${meta.updatedAt}`}
+        actions={<Button icon={<ArrowLeft size={14} />} onClick={() => navigate('/patrol-plans')}>返回列表</Button>}
       />
       <DegradedBanner meta={meta} />
       <Card size="small" style={{ marginBottom: 12 }}>
@@ -93,17 +89,11 @@ export default function PatrolPlanDetailPage() {
           <Descriptions.Item label="备注" span={3}>{plan.remark || '--'}</Descriptions.Item>
         </Descriptions>
       </Card>
-      {plan.deviceCount !== lineDevices.length && (
-        <Alert
-          type="info" showIcon style={{ marginBottom: 12 }}
-          message={`演示快照口径：巡检线路设备快照为各计划线路设备并集（${lineDevices.length} 台），与计划档案设备数 ${plan.deviceCount} 台仅供对照。`}
-        />
-      )}
       <Card type="inner" size="small" title="巡检线路设备（canonical 映射）" style={{ marginBottom: 12 }}>
         <Table
           rowKey="code" size="small" pagination={false}
           dataSource={lineDevices}
-          locale={{ emptyText: <EmptyState description="该计划暂无巡检线路设备" reason="演示快照中未包含该线路的设备行" /> }}
+          locale={{ emptyText: <EmptyState description="该计划暂无巡检线路设备" reason="暂无对应的设备行数据" /> }}
           columns={[
             { title: '设备编号', dataIndex: 'code', width: 130 },
             { title: '设备名称', width: 200, render: (_, r) => <CanonicalDeviceCell code={r.code} seedName={r.name} /> },
@@ -120,7 +110,7 @@ export default function PatrolPlanDetailPage() {
         <Table
           rowKey="code" size="small"
           dataSource={tasks}
-          locale={{ emptyText: <EmptyState description="该计划暂无关联巡检任务" reason="演示快照中未生成该计划的任务" /> }}
+          locale={{ emptyText: <EmptyState description="该计划暂无关联巡检任务" reason="暂无该计划的巡检任务" /> }}
           onRow={(r) => ({ onClick: () => navigate(`/patrol-tasks/detail?id=${encodeURIComponent(r.code)}`), style: { cursor: 'pointer' } })}
           pagination={{ pageSize: 5, showTotal: t => `共 ${t} 条` }}
           columns={[

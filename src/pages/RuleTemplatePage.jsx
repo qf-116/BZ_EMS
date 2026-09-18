@@ -40,10 +40,10 @@ export default function RuleTemplatePage() {
     const v = await form.validateFields();
     if (editing) {
       setRows(list => list.map(r => (r.code === editing.code ? { ...r, ...v } : r)));
-      message.success('模板已更新（演示）');
+      message.success('模板已更新');
     } else {
       setRows(list => [{ code: `RT-${Date.now().toString().slice(-6)}`, refs: 0, status: '启用', ...v }, ...list]);
-      message.success('模板已创建（演示），可在新增报警规则时从模板导入');
+      message.success('模板已创建，可在新增报警规则时从模板导入');
     }
     setOpen(false);
   };
@@ -54,7 +54,7 @@ export default function RuleTemplatePage() {
       ? `模板「${r.name}」已被 ${r.refs} 条规则引用。删除模板不影响已发布规则（规则为不可变版本快照），但后续无法再从该模板导入，确定删除吗？`
       : `确定删除模板「${r.name}」吗？删除后不可恢复。`,
     okText: '删除', okButtonProps: { danger: true }, cancelText: '取消',
-    onOk: () => { setRows(list => list.filter(x => x.code !== r.code)); message.success('已删除模板（演示）'); },
+    onOk: () => { setRows(list => list.filter(x => x.code !== r.code)); message.success('已删除模板'); },
   });
 
   const submitApply = () => {
@@ -62,7 +62,7 @@ export default function RuleTemplatePage() {
     const names = applyDevices.map(c => netBindings.find(b => b.code === c)?.deviceName || c).join('、');
     setApplyRow(null);
     setApplyDevices([]);
-    message.success(`已按模板「${applyRow.name}」为 ${names} 生成 ${applyDevices.length} 条规则草稿（演示），请到「报警规则配置」逐条确认并发布`);
+    message.success(`已按模板「${applyRow.name}」为 ${names} 生成 ${applyDevices.length} 条规则草稿，请到「报警规则配置」逐条确认并发布`);
   };
 
   const columns = [

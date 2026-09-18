@@ -11,13 +11,13 @@
 // ============================================================
 
 import React, { useMemo, useState } from 'react';
-import { App, Button, Card, Input, Modal, Select, Space, Statistic, Table, Tag, Timeline, Tooltip } from 'antd';
+import { App, Button, Card, DatePicker, Input, Modal, Select, Space, Statistic, Table, Tag, Timeline, Tooltip } from 'antd';
+import dayjs from 'dayjs';
 import { CheckCircle2, FilePlus2, MoreHorizontal, RotateCcw, XCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import PageHeader from '../components/PageHeader.jsx';
 import StatusTag from '../components/StatusTag.jsx';
 import EmptyState from '../components/EmptyState.jsx';
-import DataSourceBadge from '../components/DataSourceBadge.jsx';
 import DegradedBanner from '../components/DegradedBanner.jsx';
 import { useDemoStore, useDemoState, useDemoActions } from '../state/DemoStore.jsx';
 import { selectActiveAlarms, selectDevice, selectNotificationDeliveries } from '../state/selectors.js';
@@ -46,7 +46,7 @@ export default function AlarmCenterPage() {
   const [detailId, setDetailId] = useState(null);   // 详情（按 id 读最新事实）
   const [ackNote, setAckNote] = useState('');
   const [handleMeasure, setHandleMeasure] = useState('');
-  const [handleExpectedAt, setHandleExpectedAt] = useState('');
+  const [handleExpectedAt, setHandleExpectedAt] = useState(null); // dayjs 对象，提交时格式化
   const [closeEvidence, setCloseEvidence] = useState('');
   const [closeReason, setCloseReason] = useState('');
   const [recoverEvidence, setRecoverEvidence] = useState('');
@@ -61,6 +61,8 @@ export default function AlarmCenterPage() {
     const byKey = {};
     const merged = [];
     sorted.forEach(a => {
+      // 只合并未关闭事件；关闭后同一去重键再次触发生成新事件实例，历史不得吞掉新事件。
+      if (!activeIds.has(a.id)) { merged.push({ ...a, extra: 0 }); return; }
       const key = a.dedupeKey || a.id;
       if (byKey[key]) { byKey[key].extra += 1; return; }
       const row = { ...a, extra: 0 };
@@ -99,10 +101,12 @@ export default function AlarmCenterPage() {
   };
 
   const submitHandle = () => {
-    const res = actions.handleAlarm(handleRow.id, { measure: handleMeasure, expectedAt: handleExpectedAt });
+    const expectedAt = handleExpectedAt ? handleExpectedAt.format('YYYY-MM-DD HH:mm') : '';
+    if (!expectedAt) { message.warning('请选择预计恢复时间'); return; }
+    const res = actions.handleAlarm(handleRow.id, { measure: handleMeasure, expectedAt });
     if (!res.ok) { message.error(res.message); return; }
     message.success(res.message);
-    setHandleRow(null); setHandleMeasure(''); setHandleExpectedAt('');
+    setHandleRow(null); setHandleMeasure(''); setHandleExpectedAt(null);
   };
 
   const submitClose = () => {
@@ -117,7 +121,7 @@ export default function AlarmCenterPage() {
     if (!(recoverEvidence || '').trim()) { message.warning('请填写恢复证据（如指标回落值/恢复时间）'); return; }
     dispatch({ type: 'alarm/recover', payload: { alarmId: recoverRow.id, evidence: recoverEvidence.trim() } });
     message.success(recoverRow.recovery === '自动恢复'
-      ? `已登记恢复 ${recoverRow.id}：自动恢复类规则恢复后已自动关闭`
+      ? `已登记恢复 ${recoverRow.id}：自动恢复类规则已按业务关联状态进入后续流程`
       : `已登记恢复 ${recoverRow.id}：状态进入「已恢复待关闭」，请填写恢复证据与关闭原因后关闭`);
     setRecoverRow(null); setRecoverEvidence('');
   };
@@ -202,7 +206,6 @@ export default function AlarmCenterPage() {
       <PageHeader
         title="报警中心"
         subtitle={`活动 ${counts.active} 条 · 待确认 ${counts.unacked} · 确认/处理中 ${counts.handling} · 恢复待关闭 ${counts.pendingClose} · 状态机：已触发→已确认→处理中→已恢复待关闭→已关闭`}
-        actions={<DataSourceBadge meta={state.meta} />}
       />
       <DegradedBanner meta={state.meta} />
       <Card size="small">
@@ -229,7 +232,7 @@ export default function AlarmCenterPage() {
           dataSource={filtered}
           columns={columns}
           rowSelection={{ selectedRowKeys: selectedKeys, onChange: setSelectedKeys, columnWidth: 40 }}
-          locale={{ emptyText: <EmptyState description="没有符合条件的报警" reason="筛选条件下演示快照中无匹配事件，可切换到「全部状态」查看已关闭事件" /> }}
+          locale={{ emptyText: <EmptyState description="没有符合条件的报警" reason="筛选条件下暂无匹配事件，可切换到「全部状态」查看已关闭事件" /> }}
           pagination={{ pageSize: 10, showTotal: t => `共 ${t} 条` }}
         />
       </Card>
@@ -270,7 +273,7 @@ export default function AlarmCenterPage() {
             派工与改派统一在「维修任务」页面进行。
           </div>
           <Input.TextArea rows={3} placeholder="处置措施（必填），如：已更换冷却液并清洗管路，持续观察温度回落。" value={handleMeasure} onChange={e => setHandleMeasure(e.target.value)} />
-          <Input placeholder="预计恢复时间（必填），如：2026-09-16 18:30（演示时间基于样本快照）" value={handleExpectedAt} onChange={e => setHandleExpectedAt(e.target.value)} />
+          <DatePicker showTime style={{ width: '100%' }} placeholder="请选择预计恢复时间" value={handleExpectedAt} onChange={v => setHandleExpectedAt(v)} />
         </Space>
       </Modal>
 
@@ -286,7 +289,11 @@ export default function AlarmCenterPage() {
         {recoverRow && (
           <div style={{ fontSize: 12, color: '#8a97a3', marginBottom: 8 }}>
             该报警恢复口径：<b>{recoverRow.recovery || '--'}</b>。
-            {recoverRow.recovery === '自动恢复' ? '自动恢复类规则登记恢复后将自动关闭。' : '登记恢复后进入「已恢复待关闭」，需再填写恢复证据与关闭原因完成关闭。'}
+            {recoverRow.recovery === '自动恢复'
+              ? (recoverRow.relatedRepairOrderId || recoverRow.relatedDowntimeId
+                ? '存在关联工单或停机，恢复后进入「已恢复待关闭」；关闭仍需通过业务闭环校验。'
+                : '无业务关联的自动恢复类规则登记恢复后将自动关闭。')
+              : '登记恢复后进入「已恢复待关闭」，需再填写恢复证据与关闭原因完成关闭。'}
           </div>
         )}
         <Input.TextArea rows={3} placeholder="恢复证据（必填），如：主轴温度回落至 72℃，持续 30s 满足恢复条件。" value={recoverEvidence} onChange={e => setRecoverEvidence(e.target.value)} />
@@ -378,7 +385,7 @@ export default function AlarmCenterPage() {
               size="small"
               pagination={false}
               dataSource={selectNotificationDeliveries(state, detailAlarm.id)}
-              locale={{ emptyText: <EmptyState description="无通知送达记录" reason="该报警未命中通知策略或演示快照中无记录" /> }}
+              locale={{ emptyText: <EmptyState description="无通知送达记录" reason="该报警未命中通知策略或暂无送达记录" /> }}
               columns={[
                 { title: '渠道', dataIndex: 'channel', width: 90, render: v => v || '--' },
                 { title: '接收人', dataIndex: 'receiver', width: 110, render: v => v || '--' },

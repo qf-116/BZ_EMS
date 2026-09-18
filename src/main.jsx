@@ -6,57 +6,60 @@ import zhCN from 'antd/locale/zh_CN';
 import App from './App.jsx';
 import './styles.css';
 
-// 视觉基线：深青蓝主色 + 更大圆角 + 柔和投影 + 冷灰蓝底色，
-// 统一提升标准版后台的整体质感（详见 styles.css 的全局样式层）。
+// 视觉基线：科技蓝主色（蓝→青渐变呼应）+ 清透冷白底 + 状态色提饱和，
+// 数字统一 Bahnschrift/DIN 质感（详见 styles.css 的全局样式层）。
 ReactDOM.createRoot(document.getElementById('root')).render(
   <ConfigProvider
     locale={zhCN}
     theme={{
       algorithm: theme.defaultAlgorithm,
       token: {
-        colorPrimary: '#0e5a74',
-        colorInfo: '#0e7ea6',
-        colorLink: '#0e7ea6',
-        colorTextBase: '#182631',
-        colorBgLayout: '#edf1f6',
+        colorPrimary: '#1668dc',
+        colorInfo: '#4096ff',
+        colorLink: '#1668dc',
+        colorSuccess: '#16a34a',
+        colorWarning: '#f59e0b',
+        colorError: '#dc2626',
+        colorTextBase: '#1b2735',
+        colorBgLayout: '#f4f7fb',
         borderRadius: 8,
         borderRadiusLG: 12,
         fontSize: 13,
         fontFamily: "-apple-system, 'Segoe UI', 'PingFang SC', 'HarmonyOS Sans SC', 'Microsoft YaHei', Arial, sans-serif",
-        boxShadow: '0 6px 24px rgba(13, 38, 53, 0.10)',
-        boxShadowSecondary: '0 2px 8px rgba(13, 38, 53, 0.08)',
+        boxShadow: '0 6px 24px rgba(15, 34, 65, 0.10)',
+        boxShadowSecondary: '0 2px 8px rgba(15, 34, 65, 0.08)',
       },
       components: {
         Layout: {
           headerBg: '#ffffff',
-          siderBg: '#0c2231',
-          bodyBg: '#edf1f6',
+          siderBg: '#0b1526',
+          bodyBg: '#f4f7fb',
         },
         Menu: {
           darkItemBg: 'transparent',
           darkSubMenuItemBg: 'transparent',
-          darkPopupBg: '#0f2a3c',
-          darkItemColor: 'rgba(214, 232, 240, 0.72)',
+          darkPopupBg: '#101f38',
+          darkItemColor: 'rgba(203, 222, 245, 0.72)',
           darkItemHoverColor: '#ffffff',
           darkItemHoverBg: 'rgba(255, 255, 255, 0.06)',
-          darkItemSelectedBg: '#0e5a74',
+          darkItemSelectedBg: '#1668dc',
           darkItemSelectedColor: '#ffffff',
         },
         Card: {
-          boxShadowTertiary: '0 1px 2px rgba(13, 38, 53, 0.04), 0 3px 14px rgba(13, 38, 53, 0.05)',
+          boxShadowTertiary: '0 1px 2px rgba(15, 34, 65, 0.04), 0 3px 14px rgba(15, 34, 65, 0.05)',
         },
         Table: {
-          headerBg: '#f3f7fa',
+          headerBg: '#f7faff',
           headerSplitColor: 'transparent',
-          rowHoverBg: '#f2f8fb',
+          rowHoverBg: '#f0f6ff',
           headerBorderRadius: 10,
         },
         Button: {
           fontWeight: 500,
-          primaryShadow: '0 2px 8px rgba(14, 90, 116, 0.28)',
+          primaryShadow: '0 2px 10px rgba(22, 104, 220, 0.32)',
         },
         Tag: {
-          borderRadiusSM: 6,
+          borderRadiusSM: 999,
         },
       },
     }}

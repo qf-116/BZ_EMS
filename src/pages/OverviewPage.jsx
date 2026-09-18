@@ -5,7 +5,6 @@ import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YA
 import PageHeader from '../components/PageHeader.jsx';
 import MetricTile from '../components/MetricTile.jsx';
 import StatusTag from '../components/StatusTag.jsx';
-import DataSourceBadge from '../components/DataSourceBadge.jsx';
 import DegradedBanner from '../components/DegradedBanner.jsx';
 import { useDemoState } from '../state/DemoStore.jsx';
 import {
@@ -82,25 +81,22 @@ export default function OverviewPage() {
     <>
       <PageHeader
         title="监测总览"
-        subtitle={`演示快照更新于 ${meta.updatedAt || '--'} · 最后样本 ${meta.lastSampleAt || '--'}`}
+        subtitle={`数据更新于 ${meta.updatedAt || '--'} · 最后样本 ${meta.lastSampleAt || '--'}`}
         actions={<Button type="primary" ghost onClick={() => navigate('/realtime')}>进入实时监控</Button>}
       />
-      <div style={{ marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
-        <DataSourceBadge meta={meta} />
-      </div>
       <DegradedBanner meta={meta} />
       <div className="metric-grid">
         <MetricTile label="设备总数" value={rows.length} unit="台" />
-        <MetricTile label="监测中设备" value={monitored.length} unit="台" color="#0e5a74" />
-        <MetricTile label="运行" value={counts.run} unit="台" color="#227b52" />
+        <MetricTile label="监测中设备" value={monitored.length} unit="台" color="#1668dc" />
+        <MetricTile label="运行" value={counts.run} unit="台" color="#16a34a" />
         <MetricTile label="待机" value={counts.standby} unit="台" />
-        <MetricTile label="故障" value={counts.fault} unit="台" color="#c62828" />
+        <MetricTile label="故障" value={counts.fault} unit="台" color="#dc2626" />
         <MetricTile label="无数据" value={counts.noData} unit="台" color="#8d6e63" />
-        <MetricTile label="未确认报警" value={alarms.filter(a => a.status === '已触发').length} unit="条" color="#b45309" />
+        <MetricTile label="未确认报警" value={alarms.filter(a => a.status === '已触发').length} unit="条" color="#d97706" />
         <MetricTile label="处理中报警" value={alarms.filter(a => a.status === '处理中' || a.status === '已确认').length} unit="条" />
         <MetricTile label="恢复待关闭" value={alarms.filter(a => a.status === '已恢复待关闭').length} unit="条" />
-        <MetricTile label="通信正常" value={counts.normal} unit="台" color="#227b52" />
-        <MetricTile label="通信延迟 / 中断" value={counts.delayed + counts.partial + counts.offline} unit="台" color="#b45309" />
+        <MetricTile label="通信正常" value={counts.normal} unit="台" color="#16a34a" />
+        <MetricTile label="通信延迟 / 中断" value={counts.delayed + counts.partial + counts.offline} unit="台" color="#d97706" />
         <MetricTile label="非监测设备（停用/报废）" value={rows.length - monitored.length} unit="台" />
       </div>
 
@@ -147,8 +143,8 @@ export default function OverviewPage() {
           )}
         </Card>
         <Card size="small" title="数据质量">
-          <MetricTile label="正常采集设备" value={counts.normal} unit="台" color="#227b52" />
-          <MetricTile label="延迟设备" value={counts.delayed} unit="台" color="#b45309" />
+          <MetricTile label="正常采集设备" value={counts.normal} unit="台" color="#16a34a" />
+          <MetricTile label="延迟设备" value={counts.delayed} unit="台" color="#d97706" />
           <MetricTile label="部分中断 / 数据中断" value={counts.partial + counts.offline} unit="台" color="#8d6e63" />
           <MetricTile label="不参与监测（停用/报废）" value={rows.length - monitored.length} unit="台" />
         </Card>

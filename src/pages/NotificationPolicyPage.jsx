@@ -34,7 +34,7 @@ export default function NotificationPolicyPage() {
           size="small"
           scroll={{ x: 1560 }}
           dataSource={rows}
-          locale={{ emptyText: <EmptyState description="暂无通知策略" reason="演示快照中未装配通知策略数据" /> }}
+          locale={{ emptyText: <EmptyState description="暂无通知策略" reason="暂无数据" /> }}
           columns={[
             { title: '策略编号', dataIndex: 'code', width: 110, render: v => v || '--' },
             { title: '策略名称', dataIndex: 'name', width: 160, render: v => v || '--' },

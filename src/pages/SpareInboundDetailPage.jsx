@@ -3,7 +3,6 @@ import { Card, Descriptions, Table, Button } from 'antd';
 import { ArrowLeft } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import PageHeader from '../components/PageHeader.jsx';
-import DataSourceBadge from '../components/DataSourceBadge.jsx';
 import DegradedBanner from '../components/DegradedBanner.jsx';
 import EmptyState from '../components/EmptyState.jsx';
 import { useDemoState } from '../state/DemoStore.jsx';
@@ -37,7 +36,7 @@ export default function SpareInboundDetailPage() {
       <PageHeader
         title={`入库详情 · ${detail.code}`}
         subtitle="入库单只读展示 · 入库后对应仓库在库量增加并生成库存流水"
-        actions={<><DataSourceBadge meta={state.meta} /><Button icon={<ArrowLeft size={14} />} onClick={() => navigate('/spare-parts-inbound')}>返回列表</Button></>}
+        actions={<Button icon={<ArrowLeft size={14} />} onClick={() => navigate('/spare-parts-inbound')}>返回列表</Button>}
       />
       <DegradedBanner meta={state.meta} />
       <Card size="small" style={{ marginBottom: 12 }}>

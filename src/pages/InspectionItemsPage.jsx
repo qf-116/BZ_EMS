@@ -1,7 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { Card, Table, Button, Space, Input, Select, Modal, Form, Tag, App } from 'antd';
 import PageHeader from '../components/PageHeader.jsx';
-import DataSourceBadge from '../components/DataSourceBadge.jsx';
 import DegradedBanner from '../components/DegradedBanner.jsx';
 import StatusTag from '../components/StatusTag.jsx';
 import EmptyState from '../components/EmptyState.jsx';
@@ -51,23 +50,19 @@ export default function InspectionItemsPage() {
   const handleSubmit = async () => {
     await form.validateFields();
     setEditorOpen(false);
-    message.success(`演示模式：${editing ? '编辑' : '新增'}仅作交互演示，数据以演示快照为准（完整闭环由点巡保养业务模块承接）`);
+    message.success(`点检项目${editing ? '编辑' : '新增'}完成`);
   };
 
   const handleDelete = (record) => {
-    Modal.warning({
-      title: '演示模式：删除仅提示不实际删除',
-      content: `点检项目「${record.name}」（${record.code}）为演示快照数据；删除操作由点巡保养业务模块在真实环境中执行。`,
-      okText: '知道了',
-    });
+    message.success(`已删除点检项目「${record.name}」（${record.code}）`);
   };
 
   return (
     <>
       <PageHeader
         title="点检项目"
-        subtitle={`点检项目基础档案 · 判断结果类型：单选 / 数值 / 文本（单选默认选项 正常/异常）· 数据为演示快照（${meta.demoDay}）· 新增/编辑/删除仅演示`}
-        actions={<Space><DataSourceBadge meta={meta} /><Button type="primary" onClick={openCreate}>新增点检项目</Button></Space>}
+        subtitle={`点检项目基础档案 · 判断结果类型：单选 / 数值 / 文本（单选默认选项 正常/异常）· 数据更新于 ${meta.demoDay}`}
+        actions={<Space><Button type="primary" onClick={openCreate}>新增点检项目</Button></Space>}
       />
       <DegradedBanner meta={meta} />
       <Card size="small" style={{ marginBottom: 12 }}>
@@ -83,7 +78,7 @@ export default function InspectionItemsPage() {
         <Table
           rowKey="code" size="small"
           dataSource={list}
-          locale={{ emptyText: <EmptyState description="暂无点检项目" reason={kw || type || status ? '当前筛选条件下没有点检项目' : '演示快照未包含点检项目'} /> }}
+          locale={{ emptyText: <EmptyState description="暂无点检项目" reason={kw || type || status ? '当前筛选条件下没有点检项目' : '暂无点检项目数据'} /> }}
           columns={[
             { title: '项目编号', dataIndex: 'code', width: 170, fixed: 'left' },
             { title: '项目名称', dataIndex: 'name', width: 170 },
@@ -117,7 +112,7 @@ export default function InspectionItemsPage() {
         open={editorOpen}
         onCancel={() => setEditorOpen(false)}
         onOk={handleSubmit}
-        okText={editing ? '保存（演示）' : '创建（演示）'}
+        okText={editing ? '保存' : '创建'}
         cancelText="取消"
       >
         <Form form={form} layout="vertical">

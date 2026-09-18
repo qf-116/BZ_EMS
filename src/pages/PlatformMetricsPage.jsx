@@ -45,7 +45,7 @@ export default function PlatformMetricsPage() {
     <>
       <PageHeader
         title="平台指标清单"
-        subtitle="从 IoT 平台同步的只读指标目录（含版本快照与失效标记）· 指标新增/修改/停用由平台接入服务提供，本页只读 · 演示数据"
+        subtitle="从 IoT 平台同步的只读指标目录（含版本快照与失效标记）· 指标新增/修改/停用由平台接入服务提供，本页只读"
       />
       <Card size="small" style={{ marginBottom: 12 }}>
         <Space wrap>
@@ -106,7 +106,7 @@ export default function PlatformMetricsPage() {
 
       <Card
         size="small"
-        title={`接入任务（演示快照 · ${taskIssues.length} 项异常待关注）`}
+        title={`接入任务（${taskIssues.length} 项异常待关注）`}
         extra={<Typography.Text type="secondary" style={{ fontSize: 12 }}>任务由接入服务调度：拉取 / 补传 / 补偿重放</Typography.Text>}
       >
         <Table

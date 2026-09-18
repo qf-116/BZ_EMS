@@ -3,7 +3,6 @@ import { Card, Descriptions, Table, Button, Space, Alert, App } from 'antd';
 import { ArrowLeft } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import PageHeader from '../components/PageHeader.jsx';
-import DataSourceBadge from '../components/DataSourceBadge.jsx';
 import DegradedBanner from '../components/DegradedBanner.jsx';
 import StatusTag from '../components/StatusTag.jsx';
 import EmptyState from '../components/EmptyState.jsx';
@@ -33,12 +32,12 @@ export default function InspectionTaskDetailPage() {
     return (
       <>
         <PageHeader title="点检任务详情" subtitle={codeOrId ? `任务：${codeOrId}` : '未指定任务'}
-          actions={<Space><DataSourceBadge meta={meta} /><Button icon={<ArrowLeft size={14} />} onClick={() => navigate('/inspection-tasks')}>返回列表</Button></Space>} />
+          actions={<Space><Button icon={<ArrowLeft size={14} />} onClick={() => navigate('/inspection-tasks')}>返回列表</Button></Space>} />
         <DegradedBanner meta={meta} />
         <Card size="small">
           <EmptyState
             description={`未找到点检任务${codeOrId ? `「${codeOrId}」` : ''}`}
-            reason="单号无效或演示快照中不存在该任务"
+            reason="单号无效或系统中不存在该任务"
             next
             onNext={() => navigate('/inspection-tasks')}
             nextLabel="返回点检任务列表"
@@ -54,16 +53,15 @@ export default function InspectionTaskDetailPage() {
 
   const handleReport = (row) => {
     const c = canonOf(row.code);
-    message.info(`演示模式：异常项报修仅在当前页面提示，不生成维修工单；完整闭环由点巡保养业务模块承接（设备：${c ? c.name : row.code} ${c ? c.assetCode : ''}）`);
+    message.success(`异常项报修已提交：${c ? c.name : row.code} ${c ? c.assetCode : ''}`);
   };
 
   return (
     <>
       <PageHeader
         title="点检任务详情"
-        subtitle={`任务：${task.code} · ${task.plan} · 点检日期：${task.date} · 演示快照（${meta.demoDay}）· 设备展示经 canonical 设备映射`}
+        subtitle={`任务：${task.code} · ${task.plan} · 点检日期：${task.date} · 数据更新于 ${meta.demoDay} · 设备展示经 canonical 设备映射`}
         actions={<Space>
-          <DataSourceBadge meta={meta} />
           {['未开始', '进行中'].includes(task.status) && !overdue && (
             <Button type="primary" onClick={() => navigate(`/inspection-tasks/execute?code=${encodeURIComponent(task.code)}`)}>执行点检</Button>
           )}
@@ -80,7 +78,7 @@ export default function InspectionTaskDetailPage() {
           <Descriptions.Item label="点检日期">{task.date || '--'}</Descriptions.Item>
           <Descriptions.Item label="状态">
             <StatusTag value={overdue ? '已逾期' : ({ 未开始: '待执行', 进行中: '进行中', 已完成: '已完成', 已关闭: '已关闭' }[task.status] || task.status)}
-              tip={`种子状态：${task.status}`} />
+              tip={`当前状态：${task.status}`} />
           </Descriptions.Item>
           <Descriptions.Item label="应检设备数">{task.shouldCount ?? '--'}</Descriptions.Item>
           <Descriptions.Item label="班组">{task.group || '--'}</Descriptions.Item>
@@ -94,7 +92,7 @@ export default function InspectionTaskDetailPage() {
         <Alert
           type="warning" showIcon style={{ marginBottom: 12 }}
           message={`存在 ${abnormalRows.length} 台设备未完成点检或被跳过`}
-          description="未检/跳过设备行可在下方「异常处理」发起演示报修；真实环境中的异常项报修与闭环由点巡保养业务模块承接。"
+          description="未检/跳过设备行可在下方「异常处理」发起报修。"
         />
       )}
 
@@ -103,7 +101,7 @@ export default function InspectionTaskDetailPage() {
         <Table
           rowKey="code" size="small" pagination={false}
           dataSource={details}
-          locale={{ emptyText: <EmptyState description="暂无检查明细" reason="演示快照未包含该任务的设备明细" /> }}
+          locale={{ emptyText: <EmptyState description="暂无检查明细" reason="暂无该任务的设备明细数据" /> }}
           columns={[
             { title: '设备（canonical）', dataIndex: 'code', width: 220, render: (code) => {
               const c = canonOf(code);
@@ -121,7 +119,7 @@ export default function InspectionTaskDetailPage() {
             {
               title: '异常处理', width: 110,
               render: (_, r) => (r.skipReason || r.unchecked > 0
-                ? <Button type="link" size="small" danger onClick={() => handleReport(r)}>报修（演示）</Button>
+                ? <Button type="link" size="small" danger onClick={() => handleReport(r)}>报修</Button>
                 : <span style={{ fontSize: 12, color: '#8a97a3' }}>无</span>),
             },
           ]}

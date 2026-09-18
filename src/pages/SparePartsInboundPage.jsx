@@ -3,10 +3,11 @@ import { Card, Table, Button, Space, Input, DatePicker, App, Modal, Form, Select
 import { Plus } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import PageHeader from '../components/PageHeader.jsx';
-import DataSourceBadge from '../components/DataSourceBadge.jsx';
 import DegradedBanner from '../components/DegradedBanner.jsx';
 import EmptyState from '../components/EmptyState.jsx';
 import { useDemoState, useDemoActions } from '../state/DemoStore.jsx';
+import UserPickerModal from '../components/UserPickerModal.jsx';
+import { suppliers } from '../data/demo/masterData.js';
 
 const { RangePicker } = DatePicker;
 
@@ -22,6 +23,7 @@ export default function SparePartsInboundPage() {
   const [supplierKw, setSupplierKw] = useState('');
   const [open, setOpen] = useState(false);
   const [form] = Form.useForm();
+  const [handlerPickerOpen, setHandlerPickerOpen] = useState(false);
   // 幂等 requestId：仅页面局部用途（useRef 计数），提交成功后才推进
   const reqNo = useRef(1);
 
@@ -62,13 +64,14 @@ export default function SparePartsInboundPage() {
 
   const spareOptions = Object.values(state.entities.sparesByCode).map(s => ({ value: s.code, label: `${s.code} ${s.name}（${s.unit}）` }));
   const warehouseOptions = Object.values(state.entities.warehousesById).map(w => ({ value: w.warehouseId, label: w.name }));
+  // 供应商来自三方主数据，不允许手输
+  const supplierOptions = suppliers.map(s => ({ value: s.name, label: s.name }));
 
   return (
     <>
       <PageHeader
         title="入库记录"
-        subtitle="入库数据来自演示快照 · 入库后对应仓库在库量增加并生成库存流水"
-        actions={<DataSourceBadge meta={state.meta} />}
+        subtitle="入库后对应仓库在库量增加并生成库存流水"
       />
       <DegradedBanner meta={state.meta} />
       <Card size="small" style={{ marginBottom: 12 }}>
@@ -84,10 +87,10 @@ export default function SparePartsInboundPage() {
           <Button onClick={() => { setRange(null); setSupplierKw(''); }}>重置</Button>
         </Space>
       </Card>
-      <Card size="small" style={{ marginBottom: 12 }}>
-        <Button type="primary" icon={<Plus size={14} />} onClick={openForm}>到货入库</Button>
-      </Card>
       <Card size="small">
+        <Space wrap style={{ marginBottom: 12 }}>
+          <Button type="primary" icon={<Plus size={14} />} onClick={openForm}>到货入库</Button>
+        </Space>
         {filtered.length === 0 ? (
           <EmptyState description="暂无入库记录" reason="筛选条件下没有匹配的入库单，或尚未执行入库" />
         ) : (
@@ -134,14 +137,25 @@ export default function SparePartsInboundPage() {
           <Form.Item label="批次" name="batch" rules={[{ required: true, message: '请输入批次' }]}>
             <Input maxLength={30} placeholder="请输入批次（如 B2026-0916-01）" />
           </Form.Item>
-          <Form.Item label="经办人" name="handler" rules={[{ required: true, message: '请输入经办人' }]}>
-            <Input maxLength={30} placeholder="请输入经办人" />
+          <Form.Item label="经办人" name="handler" rules={[{ required: true, message: '请选择经办人' }]}>
+            <Input
+              readOnly placeholder="点击「选择」从人员主数据选取"
+              addonAfter={<Button type="link" size="small" style={{ margin: -7 }} onClick={() => setHandlerPickerOpen(true)}>选择</Button>}
+            />
           </Form.Item>
           <Form.Item label="供应商" name="supplier">
-            <Input maxLength={30} placeholder="请输入供应商名称（选填）" />
+            <Select allowClear placeholder="请选择供应商" options={supplierOptions} />
           </Form.Item>
         </Form>
       </Modal>
+
+      {/* 人员主数据选择（三方系统来源，选中后回填经办人） */}
+      <UserPickerModal
+        open={handlerPickerOpen}
+        title="选择经办人"
+        onCancel={() => setHandlerPickerOpen(false)}
+        onSelect={(u) => { form.setFieldsValue({ handler: u.name }); setHandlerPickerOpen(false); }}
+      />
     </>
   );
 }

@@ -5,7 +5,6 @@ import { Search, Cog, RefreshCw } from 'lucide-react';
 import PageHeader from '../components/PageHeader.jsx';
 import StatusTag from '../components/StatusTag.jsx';
 import EmptyState from '../components/EmptyState.jsx';
-import DataSourceBadge from '../components/DataSourceBadge.jsx';
 import DegradedBanner from '../components/DegradedBanner.jsx';
 import { useDemoState, useDemoActions } from '../state/DemoStore.jsx';
 import { selectRealtime, selectDevice, selectActiveAlarms, selectOeeResult } from '../state/selectors.js';
@@ -19,9 +18,9 @@ const QUALITY_LABEL = {
 
 // 卡片状态配色：运行绿 / 待机灰 / 故障红 / 无数据深灰
 const stateMeta = {
-  运行: { color: '#227b52' },
+  运行: { color: '#16a34a' },
   待机: { color: '#8fa3ad' },
-  故障: { color: '#c62828' },
+  故障: { color: '#dc2626' },
   无数据: { color: '#55636e' },
 };
 
@@ -159,15 +158,14 @@ export default function RealtimePage() {
         subtitle={`${rows.length} 台在用设备 · 当前筛选 ${filtered.length} 台 · 最后样本 ${meta.lastSampleAt || '--'}`}
       />
       <div style={{ marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
-        <DataSourceBadge meta={meta} />
         <span style={{ fontSize: 12, color: '#5d6b78' }}>数据源模式：</span>
         <Segmented
           size="small"
           value={meta.provider}
           onChange={changeProviderMode}
           options={[
-            { value: 'mock-polling', label: '演示轮询' },
-            { value: 'mock-subscription', label: '演示订阅' },
+            { value: 'mock-polling', label: '轮询' },
+            { value: 'mock-subscription', label: '订阅' },
             { value: 'disconnect', label: '断开（降级）' },
           ]}
         />
@@ -177,7 +175,7 @@ export default function RealtimePage() {
       {meta.provider === 'disconnect' && (
         <Alert
           type="info" showIcon style={{ marginBottom: 12 }}
-          message="断开期间指标值显示为最后快照，且不再标记为实时；切回演示轮询/演示订阅后恢复。"
+          message="断开期间无有效实时数据，指标值显示 --；切回轮询/订阅后恢复。"
         />
       )}
       <Card size="small" style={{ marginBottom: 12 }}>

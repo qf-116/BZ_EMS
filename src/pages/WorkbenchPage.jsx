@@ -6,7 +6,6 @@ import PageHeader from '../components/PageHeader.jsx';
 import MetricTile from '../components/MetricTile.jsx';
 import StatusTag from '../components/StatusTag.jsx';
 import EmptyState from '../components/EmptyState.jsx';
-import DataSourceBadge from '../components/DataSourceBadge.jsx';
 import DegradedBanner from '../components/DegradedBanner.jsx';
 import { useDemoState } from '../state/DemoStore.jsx';
 import { selectWorkbench, selectAllDevices } from '../state/selectors.js';
@@ -31,20 +30,17 @@ export default function WorkbenchPage() {
     <>
       <PageHeader
         title="工作台"
-        subtitle={`演示快照更新于 ${meta.updatedAt || '--'} · 最后样本 ${meta.lastSampleAt || '--'}`}
-        actions={<Button type="primary" onClick={() => window.open(`${window.location.href.split('#')[0]}#/screen/device`, '_blank')}>进入监测大屏</Button>}
+        subtitle={`数据更新于 ${meta.updatedAt || '--'} · 最后样本 ${meta.lastSampleAt || '--'}`}
+        actions={<Button type="primary" onClick={() => window.open('设备监测大屏演示.html', '_blank')}>进入监测大屏</Button>}
       />
-      <div style={{ marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
-        <DataSourceBadge meta={meta} />
-      </div>
       <DegradedBanner meta={meta} />
       <div className="metric-grid" style={{ marginBottom: 12 }}>
-        <MetricTile label="设备总数" value={devices.length} unit="台" color="#0e5a74" />
-        <MetricTile label="待处理报警" value={wb.unacked.length} unit="条" color="#c62828" />
+        <MetricTile label="设备总数" value={devices.length} unit="台" color="#1668dc" />
+        <MetricTile label="待处理报警" value={wb.unacked.length} unit="条" color="#dc2626" />
         <MetricTile label="维修待办（派工/验收）" value={repairTodoCount} unit="单" color="#d46b08" />
-        <MetricTile label="低库存备件" value={wb.lowStock.length} unit="项" color="#b45309" />
+        <MetricTile label="低库存备件" value={wb.lowStock.length} unit="项" color="#d97706" />
         <MetricTile label="接入任务异常" value={wb.ingestionIssues.length} unit="个" color="#8d6e63" />
-        <MetricTile label="降级设备" value={wb.degradedDevices.length} unit="台" color="#c62828" />
+        <MetricTile label="降级设备" value={wb.degradedDevices.length} unit="台" color="#dc2626" />
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 12 }}>
         <Card size="small" title={<Space><AlertTriangle size={15} /> 待处理报警（已触发）</Space>} extra={<Button type="link" size="small" onClick={() => navigate('/alarm-center')}>报警中心</Button>}>

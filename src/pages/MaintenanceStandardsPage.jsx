@@ -1,8 +1,7 @@
 import React, { useMemo, useState } from 'react';
-import { Card, Table, Button, Space, Input, Select, Tooltip } from 'antd';
+import { Card, Table, Button, Space, Input, Select } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import PageHeader from '../components/PageHeader.jsx';
-import DataSourceBadge from '../components/DataSourceBadge.jsx';
 import DegradedBanner from '../components/DegradedBanner.jsx';
 import StatusTag from '../components/StatusTag.jsx';
 import EmptyState from '../components/EmptyState.jsx';
@@ -42,8 +41,7 @@ export default function MaintenanceStandardsPage() {
     <>
       <PageHeader
         title="保养标准"
-        subtitle={`保养标准档案 · 共 ${maintenanceStandards.length} 条 · 行点击进入标准详情（关联设备 / 关联项目） · 范围外演示模块（完整闭环由点巡保养业务模块承接）`}
-        actions={<DataSourceBadge meta={meta} />}
+        subtitle={`保养标准档案 · 共 ${maintenanceStandards.length} 条 · 行点击进入标准详情（关联设备 / 关联项目）`}
       />
       <DegradedBanner meta={meta} />
       <Card size="small" style={{ marginBottom: 12 }}>
@@ -63,7 +61,7 @@ export default function MaintenanceStandardsPage() {
             emptyText: (
               <EmptyState
                 description="暂无保养标准"
-                reason={kw || status ? '当前筛选条件下没有保养标准' : '种子数据未包含保养标准'}
+                reason={kw || status ? '当前筛选条件下没有保养标准' : '暂无保养标准数据'}
               />
             ),
           }}
@@ -76,7 +74,7 @@ export default function MaintenanceStandardsPage() {
               title: '项目数', width: 90, render: (_, r) => {
                 // 种子仅提供「数控车床月度保养标准」的关联项目编号清单，其余标准不伪造
                 if (r.code === 'BYBZ20250301001') return `${maintenanceStandardItemCodes.length} 项`;
-                return <Tooltip title="演示数据未提供该标准的关联项目清单">--</Tooltip>;
+                return '--';
               },
             },
             { title: '状态', dataIndex: 'status', width: 90, render: v => <StatusTag value={v} /> },

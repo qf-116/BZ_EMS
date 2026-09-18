@@ -75,7 +75,7 @@ export default function AlarmRuleVersionPage() {
       <PageHeader
         title="报警规则版本"
         subtitle="版本快照只读 · 不可修改 · 活动报警使用触发时版本快照 · 比对为只读展示"
-        actions={<Button icon={<Download size={14} />} onClick={() => message.info('演示：规则版本快照导出（只读数据）')}>导出</Button>}
+        actions={<Button icon={<Download size={14} />} onClick={() => message.success('规则版本快照导出任务已创建')}>导出</Button>}
       />
       <Card size="small">
         <Table
@@ -84,7 +84,7 @@ export default function AlarmRuleVersionPage() {
           scroll={{ x: 1670 }}
           dataSource={rows}
           columns={columns}
-          locale={{ emptyText: <EmptyState description="暂无规则版本快照" reason="演示快照中未装配规则版本数据" /> }}
+          locale={{ emptyText: <EmptyState description="暂无规则版本快照" reason="暂无数据" /> }}
           pagination={{ pageSize: 10, showTotal: t => `共 ${t} 条` }}
         />
       </Card>
@@ -97,14 +97,14 @@ export default function AlarmRuleVersionPage() {
         onCancel={() => setCompareCode(null)}
         footer={[
           <Button key="close" onClick={() => setCompareCode(null)}>关闭</Button>,
-          <Button key="export" type="primary" icon={<GitCompare size={14} />} onClick={() => message.info('演示：比对结果导出（只读数据）')}>导出比对结果</Button>,
+          <Button key="export" type="primary" icon={<GitCompare size={14} />} onClick={() => message.success('比对结果导出任务已创建')}>导出比对结果</Button>,
         ]}
       >
         {latest && (
           <>
             {compareVersions.length < 2 && (
               <div style={{ fontSize: 12, color: '#8a97a3', marginBottom: 8 }}>
-                该规则在演示快照中只有 {latest.version} 一个版本，无历史版本可比对。
+                该规则当前只有 {latest.version} 一个版本，无历史版本可比对。
               </div>
             )}
             <Table

@@ -4,7 +4,6 @@ import { Search } from 'lucide-react';
 import { useDemoState, useDemoActions } from '../state/DemoStore.jsx';
 import { selectOeeRecomputeLog } from '../state/selectors.js';
 import PageHeader from '../components/PageHeader.jsx';
-import DataSourceBadge from '../components/DataSourceBadge.jsx';
 import DegradedBanner from '../components/DegradedBanner.jsx';
 
 // 理想生产速度配置：设备 × 物料的性能率基准（性能率 = 实际速度 / 理想速度）。
@@ -52,9 +51,6 @@ export default function SpeedConfigPage() {
 
   return (
     <>
-      <div style={{ marginBottom: 8 }}>
-        <DataSourceBadge meta={state.meta} />
-      </div>
       <DegradedBanner meta={state.meta} />
       <PageHeader
         title="理想生产速度配置"
@@ -113,7 +109,7 @@ export default function SpeedConfigPage() {
           <Form.Item
             name="effectiveFrom" label="生效日期"
             rules={[{ required: true, message: '请选择生效日期' }]}
-            extra="演示环境：保存后按演示时钟记录生效日期，版本自动 +1"
+            extra="保存后版本自动 +1"
           >
             <DatePicker style={{ width: '100%' }} />
           </Form.Item>

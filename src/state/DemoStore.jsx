@@ -16,7 +16,7 @@ const RESET = Symbol('demo-reset');
 
 // store 级 reducer：处理 reset 与函数式更新，业务动作交给业务 reducer
 function storeReducer(prev, next) {
-  if (next === RESET) return { state: createDemoState(), notice: '已重置为三个标准演示剧本的初始状态' };
+  if (next === RESET) return { state: createDemoState(), notice: '已重置为初始状态' };
   if (typeof next === 'function') return next(prev);
   return next;
 }

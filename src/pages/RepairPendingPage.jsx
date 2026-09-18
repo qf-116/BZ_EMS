@@ -2,16 +2,18 @@ import React, { useRef, useState } from 'react';
 import { Card, Tag, Button, Space, Input, Modal, Form, Select, App } from 'antd';
 import { Wrench } from 'lucide-react';
 import PageHeader from '../components/PageHeader.jsx';
-import DataSourceBadge from '../components/DataSourceBadge.jsx';
 import DegradedBanner from '../components/DegradedBanner.jsx';
 import StatusTag from '../components/StatusTag.jsx';
 import EmptyState from '../components/EmptyState.jsx';
 import { useDemoState, useDemoActions } from '../state/DemoStore.jsx';
 import { selectAllRepairReports, selectAllRepairOrders } from '../state/selectors.js';
 import { SLA_HOURS } from '../domain/repair.js';
+import { users } from '../data/demo/masterData.js';
 
 const levelColor = { 紧急: 'red', 严重: 'orange', 一般: 'blue' };
-const repairPersons = ['周强', '王强', '陈晨', '李四', '赵强'].map(v => ({ value: v, label: v }));
+// 维修人员下拉统一取自三方主数据（在职的维修工程师/设备负责人/点检员/巡检员/备件管理员）
+const repairStaff = users.filter(u => u.status === '在职' && (u.role === '维修工程师' || u.role === '设备负责人' || u.role === '点检员' || u.role === '巡检员' || u.role === '备件管理员')).map(u => u.name);
+const repairPersons = repairStaff.map(v => ({ value: v, label: v }));
 const groups = ['机修班', '电气班', '工艺班'].map(v => ({ value: v, label: v }));
 
 // 待维修看板（store 驱动）：显示所有「待派工」的维修主工单与尚未生成工单的待派工报修单，
@@ -100,7 +102,6 @@ export default function RepairPendingPage() {
       <PageHeader
         title="待维修"
         subtitle="显示所有待派工的维修工单与报修单 · 按紧急>严重>一般排序，故障发生时间降序 · 支持按紧急程度筛选与模糊搜索"
-        actions={<DataSourceBadge meta={meta} />}
       />
       <DegradedBanner meta={meta} />
       <Card size="small" style={{ marginBottom: 12 }}>
@@ -181,7 +182,7 @@ export default function RepairPendingPage() {
                 </Form.Item>
               </Space>
               <Form.Item label="备注" name="note" style={{ marginBottom: 0 }}>
-                <Input.TextArea rows={2} placeholder="故障处理建议、备件领用、安全注意事项等（演示备注不落库）" maxLength={200} />
+                <Input.TextArea rows={2} placeholder="故障处理建议、备件领用、安全注意事项等" maxLength={200} />
               </Form.Item>
             </Form>
           </>

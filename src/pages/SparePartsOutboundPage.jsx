@@ -3,9 +3,9 @@ import { Card, Table, Button, Space, DatePicker, App, Modal, Form, Select, Input
 import { PackageOpen, Undo2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import PageHeader from '../components/PageHeader.jsx';
-import DataSourceBadge from '../components/DataSourceBadge.jsx';
 import DegradedBanner from '../components/DegradedBanner.jsx';
 import EmptyState from '../components/EmptyState.jsx';
+import UserPickerModal from '../components/UserPickerModal.jsx';
 import { useDemoState, useDemoActions } from '../state/DemoStore.jsx';
 
 const { RangePicker } = DatePicker;
@@ -24,6 +24,7 @@ export default function SparePartsOutboundPage() {
   const [typeKw, setTypeKw] = useState(null);
   const [outOpen, setOutOpen] = useState(false);
   const [retTarget, setRetTarget] = useState(null);
+  const [personPickerOpen, setPersonPickerOpen] = useState(false);
   const [outForm] = Form.useForm();
   const [retForm] = Form.useForm();
   // 幂等 requestId（useRef 计数）：提交成功后才推进，失败/重复提交沿用同一 requestId
@@ -74,6 +75,7 @@ export default function SparePartsOutboundPage() {
       spareCode: values.spareCode,
       warehouseId: values.warehouseId,
       qty: values.qty,
+      person: values.person,
       requestId,
     });
     message[res.ok ? 'success' : 'error'](res.message);
@@ -122,7 +124,6 @@ export default function SparePartsOutboundPage() {
       <PageHeader
         title="出库记录"
         subtitle="维修领料出库关联维修工单（已派工/维修中） · 同一 requestId 重复提交幂等忽略 · 余料退库不超过已出库未归还量"
-        actions={<DataSourceBadge meta={state.meta} />}
       />
       <DegradedBanner meta={state.meta} />
       <Card size="small" style={{ marginBottom: 12 }}>
@@ -145,10 +146,10 @@ export default function SparePartsOutboundPage() {
           <Button onClick={() => { setRange(null); setTypeKw(null); }}>重置</Button>
         </Space>
       </Card>
-      <Card size="small" style={{ marginBottom: 12 }}>
-        <Button type="primary" icon={<PackageOpen size={14} />} onClick={openOutbound}>维修领料出库</Button>
-      </Card>
       <Card size="small">
+        <Space wrap style={{ marginBottom: 12 }}>
+          <Button type="primary" icon={<PackageOpen size={14} />} onClick={openOutbound}>维修领料出库</Button>
+        </Space>
         {filtered.length === 0 ? (
           <EmptyState description="暂无出库记录" reason="筛选条件下没有匹配的出库单，或尚未执行出库" />
         ) : (
@@ -207,6 +208,12 @@ export default function SparePartsOutboundPage() {
           <Form.Item label="出库仓库" name="warehouseId" rules={[{ required: true, message: '请选择出库仓库' }]}>
             <Select placeholder="请选择仓库" options={warehouseOptions} />
           </Form.Item>
+          <Form.Item label="领料人" name="person" rules={[{ required: true, message: '请选择领料人' }]}>
+            <Input
+              readOnly placeholder="点击「选择」从人员主数据选取"
+              addonAfter={<Button type="link" size="small" style={{ margin: -7 }} onClick={() => setPersonPickerOpen(true)}>选择</Button>}
+            />
+          </Form.Item>
           <Form.Item label="出库数量" name="qty" rules={[{ required: true, message: '请输入出库数量' }]}>
             <InputNumber style={{ width: '100%' }} min={0.01} placeholder="必须为正数且不超过可用库存" />
           </Form.Item>
@@ -218,6 +225,14 @@ export default function SparePartsOutboundPage() {
           </Typography.Text>
         </Form>
       </Modal>
+
+      {/* 领料人：人员主数据（三方系统来源）弹窗选择，选中后回填 */}
+      <UserPickerModal
+        open={personPickerOpen}
+        title="选择领料人"
+        onCancel={() => setPersonPickerOpen(false)}
+        onSelect={(u) => { outForm.setFieldsValue({ person: u.name }); setPersonPickerOpen(false); }}
+      />
 
       {/* 归还（余料退库）：从出库记录发起，数量 ≤ 已出库未归还 */}
       <Modal

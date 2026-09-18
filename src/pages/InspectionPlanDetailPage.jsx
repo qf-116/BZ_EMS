@@ -3,7 +3,6 @@ import { Card, Descriptions, Table, Button, Space } from 'antd';
 import { ArrowLeft } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import PageHeader from '../components/PageHeader.jsx';
-import DataSourceBadge from '../components/DataSourceBadge.jsx';
 import DegradedBanner from '../components/DegradedBanner.jsx';
 import StatusTag from '../components/StatusTag.jsx';
 import EmptyState from '../components/EmptyState.jsx';
@@ -27,12 +26,12 @@ export default function InspectionPlanDetailPage() {
     return (
       <>
         <PageHeader title="点检计划详情" subtitle={codeOrId ? `计划：${codeOrId}` : '未指定计划'}
-          actions={<Space><DataSourceBadge meta={meta} /><Button icon={<ArrowLeft size={14} />} onClick={() => navigate('/inspection-plans')}>返回列表</Button></Space>} />
+          actions={<Space><Button icon={<ArrowLeft size={14} />} onClick={() => navigate('/inspection-plans')}>返回列表</Button></Space>} />
         <DegradedBanner meta={meta} />
         <Card size="small">
           <EmptyState
             description={`未找到点检计划${codeOrId ? `「${codeOrId}」` : ''}`}
-            reason="编号无效或演示快照中不存在该计划"
+            reason="编号无效或系统中不存在该计划"
             next
             onNext={() => navigate('/inspection-plans')}
             nextLabel="返回点检计划列表"
@@ -49,8 +48,8 @@ export default function InspectionPlanDetailPage() {
     <>
       <PageHeader
         title="点检计划详情"
-        subtitle={`计划：${plan.code} · ${plan.name} · 状态：${plan.status} · 演示快照（${meta.demoDay}）· 完整闭环由点巡保养业务模块承接`}
-        actions={<Space><DataSourceBadge meta={meta} /><Button icon={<ArrowLeft size={14} />} onClick={() => navigate('/inspection-plans')}>返回列表</Button></Space>}
+        subtitle={`计划：${plan.code} · ${plan.name} · 状态：${plan.status} · 数据更新于 ${meta.demoDay}`}
+        actions={<Space><Button icon={<ArrowLeft size={14} />} onClick={() => navigate('/inspection-plans')}>返回列表</Button></Space>}
       />
       <DegradedBanner meta={meta} />
 
@@ -73,12 +72,12 @@ export default function InspectionPlanDetailPage() {
       </Card>
 
       <Card size="small">
-        <div style={{ fontWeight: 600, marginBottom: 12 }}>关联任务完成情况（快照内 {tasks.length} 条，已完成 {doneCount} 条）</div>
+        <div style={{ fontWeight: 600, marginBottom: 12 }}>关联任务完成情况（共 {tasks.length} 条，已完成 {doneCount} 条）</div>
         <Table
           rowKey="code" size="small"
           dataSource={tasks}
           onRow={(r) => ({ onClick: () => navigate(`/inspection-tasks/detail?code=${encodeURIComponent(r.code)}`), style: { cursor: 'pointer' } })}
-          locale={{ emptyText: <EmptyState description="暂无关联任务" reason="演示快照中该计划尚未生成点检任务" /> }}
+          locale={{ emptyText: <EmptyState description="暂无关联任务" reason="该计划尚未生成点检任务" /> }}
           columns={[
             { title: '任务编号', dataIndex: 'code', width: 180 },
             { title: '点检日期', dataIndex: 'date', width: 120, render: v => v || '--' },

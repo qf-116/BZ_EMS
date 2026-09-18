@@ -72,7 +72,7 @@ export function reducer(state, action) {
   // 确定性演示时间：每次动作 tick+1，推进 7 秒（基于 2026-09-16 16:41:08 基准，可重放）
   const tick = (state.meta.tick || 0) + 1;
   const at = fmtDemoTime(DEMO_BASE_MS + tick * 7000);
-  const actor = action.actorContext || state.meta.actorContext || { userId: 'demo-user', userName: '演示用户', source: 'host-context' };
+  const actor = action.actorContext || state.meta.actorContext || { userId: 'demo-user', userName: '管理员', source: 'host-context' };
   const payload = action.payload || {};
   state = { ...state, meta: { ...state.meta, tick } };
 
@@ -137,6 +137,38 @@ export function reducer(state, action) {
       const next = { ...state, ui: { ...state.ui, bindingDraftsByDeviceId: setIn(drafts, key, { ...draft, items }) } };
       return finish(next, action, true, `指标 ${payload.metricCode} 选择状态已切换（未保存）`, {}, false, at);
     }
+    case 'bindingTemplate/save': {
+      const templates = state.ui.bindingTemplates || [];
+      const record = { ...payload.template, createdAt: at };
+      const next = { ...state, ui: { ...state.ui, bindingTemplates: [record, ...templates] } };
+      return finish(next, action, true, `绑定模板「${payload.template.name}」已保存（来源：${payload.template.sourceName || '--'}）`, { templateId: payload.template.templateId }, false, at);
+    }
+    case 'bindingTemplate/delete': {
+      const templates = (state.ui.bindingTemplates || []).filter(t => t.templateId !== payload.templateId);
+      const next = { ...state, ui: { ...state.ui, bindingTemplates: templates } };
+      return finish(next, action, true, '绑定模板已删除', {}, false, at);
+    }
+    case 'binding/applyTemplate': {
+      // bindings 由 actions 层按模板结构构造（IoT 来源编码演示模拟：由物联网平台自动分配专属编码，天然不冲突）
+      const { bindings, autoEnable, templateName } = payload;
+      let next = state;
+      bindings.forEach((b) => {
+        const prev = E.bindingsByDeviceId[b.deviceId];
+        const newBinding = {
+          deviceId: b.deviceId, bindingId: b.bindingId, version: b.version,
+          items: b.items, configStatus: b.configStatus,
+          effectiveFrom: autoEnable ? at : null, effectiveTo: null,
+          healthStatus: prev?.healthStatus || '--',
+          pullCycleSec: prev?.pullCycleSec || 60, lastPullTime: prev?.lastPullTime || '--',
+          pullFailCount: 0, pendingCompensation: 0,
+        };
+        next = setE(next, 'bindingsByDeviceId', b.deviceId, newBinding);
+        next = setE(next, 'bindingVersionsById', b.bindingId, { bindingId: b.bindingId, deviceId: b.deviceId, version: b.version, configStatus: b.configStatus, effectiveFrom: newBinding.effectiveFrom, effectiveTo: null, summary: b.summary });
+        next = { ...next, ui: { ...next.ui, bindingDraftsByDeviceId: { ...next.ui.bindingDraftsByDeviceId, [`draft-${b.deviceId}`]: undefined } } };
+        next = addHistory(next, at, 'binding', b.bindingId, `应用绑定模板「${templateName}」→ v${b.version}（${b.configStatus}）`, { deviceId: b.deviceId });
+      });
+      return finish(next, action, true, `模板「${templateName}」已应用到 ${bindings.length} 台设备（${autoEnable ? '已启用' : '待生效'}）`, { deviceIds: bindings.map(b => b.deviceId) }, false, at);
+    }
     case 'binding/save': {
       const key = `draft-${payload.deviceId}`;
       const draft = (state.ui.bindingDraftsByDeviceId || {})[key];
@@ -165,6 +197,17 @@ export function reducer(state, action) {
       const b = E.bindingsByDeviceId[payload.deviceId];
       if (!b) return reject(state, action, '该设备尚未创建绑定');
       if (!canTransitionBinding(b.configStatus, '已启用')) return reject(state, action, `当前状态「${b.configStatus}」不能启用（状态机约束）`);
+      const occupied = new Set();
+      Object.values(E.bindingsByDeviceId).forEach(other => {
+        if (other.deviceId !== payload.deviceId && other.configStatus === '已启用') {
+          (other.items || []).forEach(i => { if (i.enabled) occupied.add(i.iotDeviceCode); });
+        }
+      });
+      const validation = validateBindingDraft(b, {
+        metricsByKey: E.metricsByKey,
+        activeIotCodesByOtherDevices: occupied,
+      });
+      if (!validation.ok) return reject(state, action, `绑定启用校验未通过：${validation.errors.join('；')}`);
       const updated = { ...b, configStatus: '已启用', effectiveFrom: at, effectiveTo: null };
       let next = setE(state, 'bindingsByDeviceId', payload.deviceId, updated);
       const vkey = Object.keys(E.bindingVersionsById).find(k => E.bindingVersionsById[k].bindingId === b.bindingId);
@@ -184,16 +227,19 @@ export function reducer(state, action) {
 
     // ================= 实时 Provider =================
     case 'realtime/refresh': {
+      if (state.meta.provider === 'disconnect') {
+        return finish(withMeta(state, at, { degraded: true, latencySec: null }), action, true, '刷新已执行：断开期间无新样本，最后样本时间不变', {}, false, at);
+      }
       const lastSampleAt = timeOnly(at);
-      let next = withMeta(state, at, { lastSampleAt, degraded: state.meta.provider === 'disconnect' ? true : false });
-      if (state.meta.provider !== 'disconnect') next = { ...next, meta: { ...next.meta, latencySec: 2 + (tick % 4) } };
-      return finish(next, action, true, `演示轮询完成：最后样本 ${lastSampleAt}，延迟 ${next.meta.latencySec}s`, {}, false, at);
+      let next = withMeta(state, at, { lastSampleAt, degraded: false });
+      next = { ...next, meta: { ...next.meta, latencySec: 2 + (tick % 4) } };
+      return finish(next, action, true, `数据刷新完成：最后样本 ${lastSampleAt}，延迟 ${next.meta.latencySec}s`, {}, false, at);
     }
     case 'realtime/setProviderMode': {
       const mode = payload.mode;
-      if (!['mock-polling', 'mock-subscription', 'disconnect'].includes(mode)) return reject(state, action, `未知演示模式：${mode}（本系统不提供真实 API 模式）`);
+      if (!['mock-polling', 'mock-subscription', 'disconnect'].includes(mode)) return reject(state, action, `未知数据源模式：${mode}`);
       const degraded = mode === 'disconnect';
-      const label = { 'mock-polling': '演示轮询', 'mock-subscription': '演示订阅', disconnect: '断开（降级）' }[mode];
+      const label = { 'mock-polling': '轮询', 'mock-subscription': '订阅', disconnect: '断开（降级）' }[mode];
       return finish(withMeta(state, at, { provider: mode, degraded }), action, true, `已切换为${label}${degraded ? '：断开期间旧值不再标记为实时' : ''}`, {}, false, at);
     }
 
@@ -294,13 +340,51 @@ export function reducer(state, action) {
     case 'alarm/recover': {
       const alarm = E.alarmEventsById[payload.alarmId];
       if (!alarm || ['已关闭', '已恢复待关闭'].includes(alarm.status)) return state;
+      if (!(payload.evidence || '').trim()) return reject(state, action, '恢复必须填写恢复证据');
       const updated = { ...alarm, status: '已恢复待关闭', recovered: payload.evidence || '指标恢复', recoveredEvidence: true, timeline: [...alarm.timeline, { type: '恢复', time: timeOnly(at), actor: actor.userName, detail: payload.evidence || '指标恢复' }] };
       let next = setE(state, 'alarmEventsById', alarm.id, updated);
-      // 自动恢复类规则：恢复后自动关闭
-      if (alarm.recovery === '自动恢复') {
+      // 自动恢复类规则：无业务关联时恢复后自动关闭；有关联时仍需通过关闭校验。
+      if (alarm.recovery === '自动恢复' && !alarm.relatedRepairOrderId && !alarm.relatedDowntimeId) {
         next = setE(next, 'alarmEventsById', alarm.id, { ...updated, status: '已关闭', timeline: [...updated.timeline, { type: '关闭', time: timeOnly(at), actor: '系统', detail: '自动恢复类规则恢复后自动关闭' }] });
       }
       return next;
+    }
+
+    case 'alarm/rule/saveDraft': {
+      const payloadRule = payload.rule || {};
+      if (!(payloadRule.code || '').trim() || !(payloadRule.name || '').trim()) return reject(state, action, '规则编号与名称必填');
+      const prev = E.alarmRulesById[payloadRule.code];
+      const rule = {
+        ...(prev || { version: 'V1', trig7d: 0, supp7d: 0, storm: '≤ 3 条/小时' }),
+        ...payloadRule,
+        status: '草稿',
+      };
+      const next = setE(state, 'alarmRulesById', rule.code, rule);
+      return finish(next, action, true, `规则 ${rule.code} 草稿已保存`, { ruleCode: rule.code }, false, at);
+    }
+    case 'alarm/rule/publish': {
+      const rule = E.alarmRulesById[payload.ruleCode];
+      if (!rule) return reject(state, action, '规则不存在');
+      if (rule.status !== '草稿') return reject(state, action, `规则 ${rule.code} 当前状态「${rule.status}」，只有草稿可发布`);
+      const oldNo = String(rule.version || 'V0').replace(/\D/g, '');
+      const version = `V${Number(oldNo || 0) + 1}`;
+      const published = { ...rule, status: '已发布', version };
+      let next = setE(state, 'alarmRulesById', rule.code, published);
+      const versionKey = `${rule.code}|${version}`;
+      next = setE(next, 'alarmRuleVersionsById', versionKey, {
+        code: rule.code, name: rule.name, version, publish: at, publisher: actor.userName,
+        effective: `${at} 至今`, condition: rule.condition, notify: rule.policy || '--',
+        events: 0, status: '已发布',
+      });
+      next = addHistory(next, at, 'alarm-rule', rule.code, `发布规则 ${rule.code} ${version}`, {});
+      return finish(next, action, true, `规则 ${rule.code} 已发布为 ${version}`, { ruleCode: rule.code, version }, false, at);
+    }
+    case 'alarm/rule/disable': {
+      const rule = E.alarmRulesById[payload.ruleCode];
+      if (!rule) return reject(state, action, '规则不存在');
+      if (rule.status !== '已发布') return reject(state, action, `规则 ${rule.code} 当前状态「${rule.status}」，不能停用`);
+      const next = setE(state, 'alarmRulesById', rule.code, { ...rule, status: '已停用' });
+      return finish(next, action, true, `规则 ${rule.code} 已停用，不再触发新报警`, { ruleCode: rule.code }, false, at);
     }
 
     // ================= 维修 =================
@@ -419,7 +503,7 @@ export function reducer(state, action) {
 
     // ================= 备件 =================
     case 'spare/consume': {
-      const { repairOrderId, spareCode, warehouseId, qty, requestId } = payload;
+      const { repairOrderId, spareCode, warehouseId, qty, requestId, person } = payload;
       const order = E.repairOrdersById[repairOrderId];
       if (!order) return reject(state, action, '维修工单不存在');
       if (!['已派工', '维修中'].includes(order.status)) return reject(state, action, `工单状态「${order.status}」不允许领料出库`);
@@ -432,7 +516,7 @@ export function reducer(state, action) {
       const spare = E.sparesByCode[spareCode];
       const outbound = {
         outboundId, code: `ck${dateOnly(at).replaceAll('-', '')}${seq()}`, type: '维修出库', repairOrderId,
-        idempotencyKey: idemKey, warehouseId, date: dateOnly(at), status: '已出库', person: actor.userName, creator: actor.userName,
+        idempotencyKey: idemKey, warehouseId, date: dateOnly(at), status: '已出库', person: person || actor.userName, creator: actor.userName,
         createTime: at, remark: `维修任务 ${repairOrderId} 领料。`,
         items: [{ spareCode, spareName: spare?.name || spareCode, unit: spare?.unit || '--', qty }],
       };
@@ -470,12 +554,12 @@ export function reducer(state, action) {
       if (!spare) return reject(state, action, '备件不存在');
       const inboundId = `IB-${dateOnly(at).replaceAll('-', '')}-${seq()}`;
       const stockRow = E.stockByKey[stockKey];
-      const record = { inboundId, code: `rk${dateOnly(at).replaceAll('-', '')}${seq()}`, supplier: supplier || '--', buyer: handler || actor.userName, date: dateOnly(at), status: '已入库', creator: actor.userName, createTime: at, remark: '演示入库', items: [{ spareCode, spareName: spare.name, unit: spare.unit, warehouseId, qty, batch: batch || '--' }] };
+      const record = { inboundId, code: `rk${dateOnly(at).replaceAll('-', '')}${seq()}`, supplier: supplier || '--', buyer: handler || actor.userName, date: dateOnly(at), status: '已入库', creator: actor.userName, createTime: at, remark: '入库', items: [{ spareCode, spareName: spare.name, unit: spare.unit, warehouseId, qty, batch: batch || '--' }] };
       let next = setE(state, 'inboundsById', inboundId, record);
       if (stockRow) next = setE(next, 'stockByKey', stockKey, { ...stockRow, onHand: stockRow.onHand + qty });
       else next = setE(next, 'stockByKey', stockKey, { stockKey, warehouseId, spareCode, onHand: qty, reserved: 0, outboundDone: 0, returned: 0, batch: batch || 'B-DEMO' });
       const flowId = `SF-${inboundId}`;
-      next = setE(next, 'stockFlowsById', flowId, { flowId, time: at, warehouseId, spareCode, type: '入库', qty, balanceAfter: (stockRow?.onHand || 0) + qty, ref: inboundId, note: '演示入库' });
+      next = setE(next, 'stockFlowsById', flowId, { flowId, time: at, warehouseId, spareCode, type: '入库', qty, balanceAfter: (stockRow?.onHand || 0) + qty, ref: inboundId, note: '入库' });
       return finish(next, action, true, `入库单 ${inboundId}：${spare.name} ×${qty} → ${warehouseId}`, { inboundId }, false, at);
     }
 
@@ -527,7 +611,7 @@ export function reducer(state, action) {
       const rcId = `RC-${dateOnly(at).replaceAll('-', '')}-${seq()}`;
       next = setE(next, 'oeeRecomputeLogById', rcId, { recomputeId: rcId, deviceId: cfg.deviceId, range: `${dateOnly(at)} 起`, reason: `理想速度配置 v${updated.version} 变更`, at, revision: Object.keys(next.entities.oeeRecomputeLogById).length + 1 });
       next = addHistory(next, at, 'oee', cfg.id, `理想速度变更为 ${payload.idealSpeed}（v${updated.version}）`, { deviceId: cfg.deviceId });
-      return finish(next, action, true, `速度配置已保存：v${updated.version}，生效 ${dateOnly(at)}；受影响设备 ${cfg.deviceName}，已触发演示重算`, { configId: cfg.id, recomputeId: rcId }, false, at);
+      return finish(next, action, true, `速度配置已保存：v${updated.version}，生效 ${dateOnly(at)}；受影响设备 ${cfg.deviceName}，已触发 OEE 重算`, { configId: cfg.id, recomputeId: rcId }, false, at);
     }
     case 'oee/saveConfig': {
       const target = payload.target;
@@ -556,9 +640,9 @@ export function reducer(state, action) {
     }
     case 'report/createExport': {
       const id = `EXP-${dateOnly(at).replaceAll('-', '')}-${seq()}`;
-      const record = { exportId: id, theme: payload.theme, filters: payload.filters || {}, status: '成功', note: '演示导出：本地生成内容，已标注演示口径', createdAt: at, statsCutoff: state.meta.lastSampleAt };
+      const record = { exportId: id, theme: payload.theme, filters: payload.filters || {}, status: '成功', note: '导出内容', createdAt: at, statsCutoff: state.meta.lastSampleAt };
       let next = setE(state, 'exportTasksById', id, record);
-      return finish(next, action, true, `导出任务 ${id} 已创建（演示导出，口径截止 ${record.statsCutoff}）`, { exportId: id }, false, at);
+      return finish(next, action, true, `导出任务 ${id} 已创建（口径截止 ${record.statsCutoff}）`, { exportId: id }, false, at);
     }
 
     // ================= 大屏 =================

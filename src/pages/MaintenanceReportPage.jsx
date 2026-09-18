@@ -1,10 +1,9 @@
 import React, { useMemo, useState } from 'react';
-import { Card, Table, Tabs, Button, Tooltip, Typography, Modal, Space, Tag } from 'antd';
+import { Card, Table, Tabs, Button, Tooltip, Typography, Modal, Space, Tag, DatePicker } from 'antd';
+import dayjs from 'dayjs';
 import { Download } from 'lucide-react';
 import PageHeader from '../components/PageHeader.jsx';
-import DataSourceBadge from '../components/DataSourceBadge.jsx';
 import DegradedBanner from '../components/DegradedBanner.jsx';
-import StatusTag from '../components/StatusTag.jsx';
 import EmptyState from '../components/EmptyState.jsx';
 import { useDemoState } from '../state/DemoStore.jsx';
 import {
@@ -15,6 +14,7 @@ import {
 import { crosswalkByAssetCode } from '../data/demo/deviceCrosswalk.js';
 
 const dash = (v) => (v === null || v === undefined || v === '' ? '--' : v);
+const { RangePicker } = DatePicker;
 
 function parseAssetCode(deviceStr) {
   const m = String(deviceStr || '').match(/MT\d{4}A\d+/);
@@ -36,9 +36,21 @@ export default function MaintenanceReportPage() {
   const meta = state.meta;
   const [exportOpen, setExportOpen] = useState(false);
 
+  // 统计日期范围筛选：未选范围时不过滤；选了范围后缺日期的行排除
+  const [range, setRange] = useState(null);
+  const inRange = (d) => {
+    if (!range || !range[0] || !range[1]) return true;
+    if (!d) return false;
+    const s = String(d).slice(0, 10);
+    return s >= range[0].format('YYYY-MM-DD') && s <= range[1].format('YYYY-MM-DD');
+  };
+  // 任务行按计划日期 date 过滤；设备明细行按执行时间 execTime 过滤
+  const tasks = useMemo(() => maintenanceTasks.filter(t => inRange(t.date)), [range]); // eslint-disable-line react-hooks/exhaustive-deps
+  const details = useMemo(() => maintenanceTaskDetails.filter(d => inRange(d.execTime)), [range]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const deviceRows = useMemo(() => {
     const byDevice = new Map();
-    maintenanceTasks.forEach((t) => {
+    tasks.forEach((t) => {
       const assetCode = parseAssetCode(t.device);
       const key = assetCode || t.device || '--';
       if (!byDevice.has(key)) byDevice.set(key, []);
@@ -47,7 +59,7 @@ export default function MaintenanceReportPage() {
     return [...byDevice.entries()].map(([assetCode, tasks]) => {
       const cw = crosswalkByAssetCode[assetCode];
       const ledger = ledgerDevices.find(d => d.code === assetCode);
-      const detailRows = maintenanceTaskDetails.filter(d => d.code === assetCode);
+      const detailRows = details.filter(d => d.code === assetCode);
       const itemTotal = detailRows.reduce((s, d) => {
         const n = typeof d.itemCount === 'string' ? parseInt(d.itemCount, 10) : d.itemCount;
         return s + (Number.isFinite(n) ? n : 0);
@@ -68,16 +80,16 @@ export default function MaintenanceReportPage() {
         rate: pct(done, total - closed),
         abnormalRate: itemTotal > 0 ? pct(unchecked, itemTotal) : '--',
         abnormalTip: itemTotal > 0
-          ? `未执行 ${unchecked} 项 / 共 ${itemTotal} 项（种子任务明细）`
-          : '演示数据未提供该设备的保养项目明细',
+          ? `未执行 ${unchecked} 项 / 共 ${itemTotal} 项`
+          : '暂无该设备的保养项目明细数据',
         hours: '--',
       };
     }).sort((a, b) => b.total - a.total);
-  }, []);
+  }, [tasks, details]);
 
   const ownerRows = useMemo(() => {
     const byOwner = new Map();
-    maintenanceTasks.forEach((t) => {
+    tasks.forEach((t) => {
       const key = t.owner || '--';
       if (!byOwner.has(key)) byOwner.set(key, []);
       byOwner.get(key).push(t);
@@ -97,14 +109,14 @@ export default function MaintenanceReportPage() {
         hours: '--',
       };
     }).sort((a, b) => b.total - a.total);
-  }, []);
+  }, [tasks]);
 
   const totals = useMemo(() => {
-    const total = maintenanceTasks.length;
-    const done = taskCount(maintenanceTasks, '已完成');
-    const closed = taskCount(maintenanceTasks, '已关闭');
+    const total = tasks.length;
+    const done = taskCount(tasks, '已完成');
+    const closed = taskCount(tasks, '已关闭');
     return { total, done, closed, rate: pct(done, total - closed) };
-  }, []);
+  }, [tasks]);
 
   const deviceColumns = [
     { title: '设备编号', dataIndex: 'assetCode', width: 130 },
@@ -128,7 +140,7 @@ export default function MaintenanceReportPage() {
     },
     {
       title: '工时合计（小时）', dataIndex: 'hours', width: 120,
-      render: (v) => <Tooltip title="演示种子数据未包含工时字段，由点巡保养业务模块回填">--</Tooltip>,
+      render: (v) => <Tooltip title="暂无工时数据">--</Tooltip>,
     },
   ];
 
@@ -140,11 +152,11 @@ export default function MaintenanceReportPage() {
     { title: '计划完成率', dataIndex: 'rate', width: 100, render: v => <Typography.Text strong={v !== '--'}>{v}</Typography.Text> },
     {
       title: '异常率', dataIndex: 'abnormalRate', width: 100,
-      render: (v) => <Tooltip title="演示种子数据未提供执行人维度的保养项目明细，无法计算异常率">--</Tooltip>,
+      render: (v) => <Tooltip title="暂无该执行人的保养项目明细数据，无法计算异常率">--</Tooltip>,
     },
     {
       title: '工时合计（小时）', dataIndex: 'hours', width: 120,
-      render: (v) => <Tooltip title="演示种子数据未包含工时字段，由点巡保养业务模块回填">--</Tooltip>,
+      render: (v) => <Tooltip title="暂无工时数据">--</Tooltip>,
     },
   ];
 
@@ -152,19 +164,28 @@ export default function MaintenanceReportPage() {
     <>
       <PageHeader
         title="保养执行统计"
-        subtitle={`按设备 / 执行人聚合保养任务（种子 ${maintenanceTasks.length} 条）：计划完成率 = 已完成 /（总数 − 已关闭）· 范围外演示模块（完整闭环由点巡保养业务模块承接）`}
-        actions={<><DataSourceBadge meta={meta} /><Button icon={<Download size={14} />} onClick={() => setExportOpen(true)}>导出</Button></>}
+        subtitle={`按设备 / 执行人聚合保养任务（共 ${maintenanceTasks.length} 条）：计划完成率 = 已完成 /（总数 − 已关闭）`}
+        actions={<Button icon={<Download size={14} />} onClick={() => setExportOpen(true)}>导出</Button>}
       />
       <DegradedBanner meta={meta} />
 
       <Card size="small" style={{ marginBottom: 12 }}>
         <Space size={32} wrap>
+          <RangePicker
+            style={{ width: 250 }} allowClear
+            value={range} onChange={setRange}
+            presets={[
+              { label: '最近7天', value: [dayjs().subtract(6, 'day'), dayjs()] },
+              { label: '最近30天', value: [dayjs().subtract(29, 'day'), dayjs()] },
+            ]}
+            placeholder={['开始日期', '结束日期']}
+          />
           <Typography.Text>任务总数：<strong>{totals.total}</strong></Typography.Text>
           <Typography.Text>已完成：<strong>{totals.done}</strong></Typography.Text>
           <Typography.Text>已关闭：<strong>{totals.closed}</strong></Typography.Text>
           <Typography.Text>整体计划完成率：<strong>{totals.rate}</strong></Typography.Text>
           <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-            数据基准：{meta.updatedAt}（只读演示种子）
+            数据基准：{meta.updatedAt}
           </Typography.Text>
         </Space>
       </Card>
@@ -183,7 +204,7 @@ export default function MaintenanceReportPage() {
                   dataSource={deviceRows}
                   columns={deviceColumns}
                   pagination={false}
-                  locale={{ emptyText: <EmptyState description="暂无保养任务" reason="种子数据未包含保养任务" /> }}
+                  locale={{ emptyText: <EmptyState description="暂无保养任务" reason="暂无保养任务数据" /> }}
                 />
               ),
             },
@@ -196,7 +217,7 @@ export default function MaintenanceReportPage() {
                   dataSource={ownerRows}
                   columns={ownerColumns}
                   pagination={false}
-                  locale={{ emptyText: <EmptyState description="暂无保养任务" reason="种子数据未包含保养任务" /> }}
+                  locale={{ emptyText: <EmptyState description="暂无保养任务" reason="暂无保养任务数据" /> }}
                 />
               ),
             },
@@ -212,10 +233,8 @@ export default function MaintenanceReportPage() {
         footer={<Button type="primary" onClick={() => setExportOpen(false)}>知道了</Button>}
       >
         <Space direction="vertical" size={8}>
-          <StatusTag value="演示数据" tip="保养模块为范围外演示，导出为占位" />
           <Typography.Text>
-            演示模式：完整闭环由点巡保养业务模块承接。导出功能为演示占位，不生成真实报表文件；
-            正式导出（含工时台账与异常明细）由点巡保养业务模块提供。
+            导出内容：按设备 / 执行人聚合的保养执行统计报表（含计划完成率与异常率明细）。
           </Typography.Text>
         </Space>
       </Modal>

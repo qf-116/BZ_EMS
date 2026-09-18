@@ -3,8 +3,9 @@ import { Card, Table, Tag, Button, Space, Select, App, Input, InputNumber, Switc
 import { Plus, TestTube2, Zap, Info } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import PageHeader from '../components/PageHeader.jsx';
-import { ruleRows, metricAlarmTemplates, ruleTemplates, notificationRows } from '../data/demoData.js';
+import { metricAlarmTemplates, ruleTemplates, notificationRows } from '../data/demoData.js';
 import { netBindings } from '../data/standardData.js';
+import { useDemoState, useDemoActions } from '../state/DemoStore.jsx';
 
 // 报警规则配置 V3：围绕「一直大于某个值 → 报警爆炸」问题补齐防抖、恢复迟滞（回差）、
 // 活动事件重复抑制、报警风暴保护（限流合并）与治理统计。
@@ -17,7 +18,10 @@ const sourceMeta = {
   'R-COMPARE-001': { dataSource: 'aggregated', chain: ['MES 程序比对', '设备程序快照', '基线参数集'], latency: '事件级（比对任务）' },
   'R-QUALITY-001': { dataSource: 'aggregated', chain: ['全部设备', '绑定健康汇总', 'last_pull_time'], latency: '分钟级（聚合）' },
 };
-const enrich = (r) => ({ ...r, ...(sourceMeta[r.code] || { dataSource: 'aggregated', chain: [r.device, '--', r.metric], latency: '事件级（业务）' }) });
+const enrich = (r) => ({
+  ...r,
+  ...(sourceMeta[r.code] || { dataSource: 'aggregated', chain: [r.deviceScope || '--', '--', r.metricCode || '--'], latency: '事件级（业务）' }),
+});
 
 // 三级联动演示数据源：设备 → 来源设备 → 已勾选指标
 const deviceOptions = netBindings.filter(b => b.configStatus === '已启用').map(b => ({ value: b.code, label: `${b.code} ${b.deviceName}` }));
@@ -50,13 +54,18 @@ const RULE_TYPE_LABEL = { threshold: '阈值规则', state: '状态规则', qual
 export default function RuleConfigPage() {
   const { message, modal } = App.useApp();
   const navigate = useNavigate();
+  const state = useDemoState();
+  const actions = useDemoActions();
 
   // 停用规则：二次确认（停用后挂起判定，历史报警与版本快照保留）
   const confirmStop = (r) => modal.confirm({
     title: '停用报警规则',
     content: `确定停用报警规则「${r.name}（${r.code}）」吗？停用后规则挂起判定，历史报警与版本快照保留。`,
     okText: '停用', cancelText: '取消',
-    onOk: () => message.success('已停用（演示）'),
+    onOk: () => {
+      const res = actions.disableRule(r.code);
+      message[res.ok ? 'success' : 'error'](res.message);
+    },
   });
   const [open, setOpen] = React.useState(false);
   const [editing, setEditing] = React.useState(null);      // 编辑中的规则（新增为 null）
@@ -112,10 +121,33 @@ export default function RuleConfigPage() {
     if (t.deadband != null) setDeadband(t.deadband);
   };
 
-  const rows = ruleRows.map(enrich);
+  const rows = Object.values(state.entities.alarmRulesById).map(enrich);
   const openCreate = () => { setEditing(null); setRuleType('threshold'); setImportedTpl(null); setOpen(true); };
   const openEdit = (r) => { setEditing(r); setRuleType(RULE_TYPE_KEY[r.type] || 'threshold'); setOpen(true); };
   const openTest = (r) => { setTestRule(r); setTestOpen(true); };
+  const saveRule = ({ publish = false } = {}) => {
+    const rule = {
+      ...(editing || {}),
+      code: editing?.code || `R-NEW-${String(Object.keys(state.entities.alarmRulesById).length + 1).padStart(3, '0')}`,
+      name: editing?.name || `新规则 ${Object.keys(state.entities.alarmRulesById).length + 1}`,
+      type: { threshold: '阈值', state: '状态', quality: '质量', combo: '组合' }[ruleType] || '阈值',
+      deviceScope: editing?.deviceScope || state.entities.devicesById[selDevice]?.name || selDevice,
+      metricCode: selMetric || editing?.metricCode || '--',
+      condition: editing?.condition || `阈值 ${trigThreshold} 持续 ${trigDuration}s`,
+      recovery: editing?.recovery || '自动恢复',
+      severity: editing?.severity || '重要',
+      policyCode: editing?.policyCode || 'NP-IMPORTANT',
+    };
+    const saveRes = actions.saveRuleDraft(rule);
+    if (!saveRes.ok) { message.error(saveRes.message); return; }
+    if (publish) {
+      const pubRes = actions.publishRule(saveRes.refs.ruleCode);
+      message[pubRes.ok ? 'success' : 'error'](pubRes.message);
+    } else {
+      message.success(saveRes.message);
+    }
+    setOpen(false);
+  };
 
   // 判定数据源不手工选择：由规则类型 + 所选指标自动推导
   // 质量 → 数据链路质量汇总（聚合）；业务事件类规则 → 事件级；其余（订阅指标 M.*/S.*）→ 实时订阅流
@@ -184,7 +216,7 @@ export default function RuleConfigPage() {
             ) },
             { title: '近7天 触发/抑制', width: 110, render: (_, r) => (
               <span style={{ fontVariantNumeric: 'tabular-nums' }}>
-                {r.trig7d} / <span style={{ color: r.supp7d > r.trig7d ? '#b45309' : undefined }}>{r.supp7d}</span>
+                {r.trig7d} / <span style={{ color: r.supp7d > r.trig7d ? '#d97706' : undefined }}>{r.supp7d}</span>
               </span>
             ) },
             { title: '等级', dataIndex: 'severity', width: 70, render: v => v === '紧急' ? <Tag color="error">{v}</Tag> : v === '重要' ? <Tag color="warning">{v}</Tag> : <Tag color="gold">{v}</Tag> },
@@ -196,7 +228,7 @@ export default function RuleConfigPage() {
                 <a onClick={() => openEdit(r)}>编辑</a>
                 <a onClick={() => openTest(r)}>测试</a>
                 <a onClick={() => navigate('/alarm-rule-versions')}>版本</a>
-                <a style={{ color: '#b45309' }} onClick={() => confirmStop(r)}>停用</a>
+                <a style={{ color: '#d97706' }} onClick={() => confirmStop(r)}>停用</a>
               </div>
             ) },
           ]}
@@ -211,9 +243,9 @@ export default function RuleConfigPage() {
         open={open}
         onCancel={() => setOpen(false)}
         footer={[
-          <Button key="draft" onClick={() => setOpen(false)}>保存草稿</Button>,
-          <Button key="tpl" onClick={() => message.success('演示：已将当前规则参数保存为新模板，可在「报警规则模板」中维护并复用')}>存为模板</Button>,
-          <Button key="pub" type="primary" onClick={() => { setOpen(false); message.success('演示：发布将生成不可变版本快照（含指标版本快照与全部阈值参数）'); }}>发布</Button>,
+          <Button key="draft" onClick={() => saveRule({ publish: false })}>保存草稿</Button>,
+          <Button key="tpl" onClick={() => message.success('已将当前规则参数保存为新模板，可在「报警规则模板」中维护并复用')}>存为模板</Button>,
+          <Button key="pub" type="primary" onClick={() => saveRule({ publish: true })}>发布</Button>,
         ]}
       >
         <div style={{ maxHeight: '66vh', overflowY: 'auto', paddingRight: 8 }}>
@@ -315,10 +347,10 @@ export default function RuleConfigPage() {
                       <Select defaultValue={c.metric} style={{ width: 250 }} options={metricOptions(selDevice, selSource)} />
                       <span>{c.cond}</span>
                     </Space>
-                    <a onClick={() => message.info('已删除子条件（演示）')}>删除</a>
+                    <a onClick={() => message.info('已删除子条件')}>删除</a>
                   </Space>
                 ))}
-                <Button type="dashed" block onClick={() => message.info('添加子条件：选择指标后按指标特征模板带出推荐判定模式（演示）')}>+ 添加子条件</Button>
+                <Button type="dashed" block onClick={() => message.info('添加子条件：选择指标后按指标特征模板带出推荐判定模式')}>+ 添加子条件</Button>
               </Space>
             ) : (
             <Space direction="vertical" style={{ width: '100%' }} size={8}>
@@ -469,7 +501,7 @@ export default function RuleConfigPage() {
                   style={{ width: 320 }}
                   options={notificationRows.map(n => ({ value: n.code, label: `${n.code} ${n.name}（${n.level}）` }))}
                 />
-                <a onClick={() => message.info('演示：跳转到「通知策略配置」查看 / 新增策略')}>查看 / 新增策略</a>
+                <a onClick={() => message.info('跳转到「通知策略配置」查看 / 新增策略')}>查看 / 新增策略</a>
               </Space>
               <div style={hint}>站内通知为兜底必发渠道；外部渠道（短信 / 企业微信）不可作为唯一通知方式。</div>
             </Space>
@@ -502,8 +534,8 @@ export default function RuleConfigPage() {
           <>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 8 }}>
               <Statistic title="近7天条件命中" value={testRule.trig7d + testRule.supp7d} suffix="次" />
-              <Statistic title="实际生成事件" value={testRule.trig7d} suffix="条" valueStyle={{ color: '#0e7ea6' }} />
-              <Statistic title="被抑制 / 合并" value={testRule.supp7d} suffix="次" valueStyle={{ color: '#b45309' }} />
+              <Statistic title="实际生成事件" value={testRule.trig7d} suffix="条" valueStyle={{ color: '#00b8d4' }} />
+              <Statistic title="被抑制 / 合并" value={testRule.supp7d} suffix="次" valueStyle={{ color: '#d97706' }} />
             </div>
             <Alert type="info" showIcon message="回测按当前规则参数（含持续时间、回差、抑制与限流）重放近 7 天历史数据；若「被抑制」占比过高，说明存在持续超限或阈值抖动，建议增大回差或延长持续时间。" />
           </>

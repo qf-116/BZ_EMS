@@ -14,7 +14,7 @@ const nextActionId = () => `demo-action-20260916-${String(++actionSeq).padStart(
 
 export function createDemoActions(state, dispatch) {
   const E = state.entities;
-  const actor = state.meta.actorContext || { userId: 'demo-user', userName: '演示用户', source: 'host-context' };
+  const actor = state.meta.actorContext || { userId: 'demo-user', userName: '管理员', source: 'host-context' };
 
   const act = (type, payload, idempotencyKey) => {
     dispatch({ type, payload, actorContext: actor, actionId: nextActionId(), idempotencyKey, at: undefined });
@@ -57,15 +57,54 @@ export function createDemoActions(state, dispatch) {
       act('binding/toggleMetric', { deviceId, iotDeviceId, metricCode });
       return { ok: true, message: '指标选择已切换（未保存）', refs: { deviceId } };
     },
+    saveBindingTemplate(template) {
+      act('bindingTemplate/save', { template });
+      return { ok: true, message: `绑定模板「${template.name}」已保存，可在「应用到设备」中批量使用`, refs: { templateId: template.templateId } };
+    },
+    deleteBindingTemplate(templateId, name) {
+      act('bindingTemplate/delete', { templateId });
+      return { ok: true, message: `绑定模板「${name}」已删除`, refs: {} };
+    },
+    // 批量应用模板：按模板结构为每台设备构造绑定（IoT 来源编码演示模拟：
+    // 由物联网平台按设备自动分配专属编码 IOT-D/IOT-S-2xx，全局唯一，不与已占用编码冲突）
+    applyBindingTemplate({ deviceIds, template, autoEnable }) {
+      if (!template) return fail('请先选择绑定模板');
+      if (!deviceIds || deviceIds.length === 0) return fail('请先选择要应用的设备');
+      let seq = 0;
+      const bindings = deviceIds.map((deviceId) => {
+        const current = E.bindingsByDeviceId[deviceId];
+        const version = (current?.version || 0) + 1;
+        const bindingId = `binding-${deviceId.replace('DEV-', 'D')}-${version >= 10 ? '' : '0'}${version}`;
+        const device = E.devicesById[deviceId];
+        const items = (template.items || []).map((t) => {
+          seq += 1;
+          const code = t.role === 'main' ? `IOT-D-2${100 + seq}` : `IOT-S-2${100 + seq}`;
+          return {
+            iotDeviceId: `iot-auto-${bindingId}-${seq}`, iotDeviceCode: code,
+            name: `${device?.name || deviceId} ${t.kind === '主设备' ? '主控制器' : (t.sensorType || '传感器')}`,
+            role: t.role, sensorType: t.role === 'main' ? '--' : (t.sensorType || t.kind || '子传感器'),
+            kind: t.kind, enabled: true,
+            metrics: (t.metrics || []).map(m => ({ ...m, selected: true })),
+          };
+        });
+        return { deviceId, bindingId, version, configStatus: autoEnable ? '已启用' : '待生效', items, summary: `应用模板「${template.name}」` };
+      });
+      act('binding/applyTemplate', { bindings, autoEnable, templateName: template.name });
+      return {
+        ok: true,
+        message: `模板「${template.name}」已应用到 ${deviceIds.length} 台设备（${autoEnable ? '已启用，影响监测/报警/OEE/报表' : '待生效，需再点「启用」'}）`,
+        refs: { deviceIds },
+      };
+    },
 
     // ---------- 实时 ----------
     refreshRealtime() {
       act('realtime/refresh', {});
-      return { ok: true, message: '演示轮询完成', refs: {} };
+      return { ok: true, message: '数据刷新完成', refs: {} };
     },
     setProviderMode(mode) {
       act('realtime/setProviderMode', { mode });
-      const label = { 'mock-polling': '演示轮询', 'mock-subscription': '演示订阅', disconnect: '断开（降级）' }[mode];
+      const label = { 'mock-polling': '轮询', 'mock-subscription': '订阅', disconnect: '断开（降级）' }[mode];
       return { ok: true, message: `已切换为${label}`, refs: {} };
     },
 
@@ -105,6 +144,29 @@ export function createDemoActions(state, dispatch) {
       if (!(evidence || '').trim() || !(closeReason || '').trim()) return fail('关闭必须填写恢复证据和原因');
       act('alarm/close', { alarmId, evidence, closeReason }, `close:${alarmId}:v1`);
       return { ok: true, message: `已关闭 ${alarm.id}`, refs: { alarmId } };
+    },
+
+    saveRuleDraft(rule) {
+      const code = (rule.code || '').trim();
+      const name = (rule.name || '').trim();
+      if (!code) return fail('规则编号必填');
+      if (!name) return fail('规则名称必填');
+      act('alarm/rule/saveDraft', { rule: { ...rule, code, name } });
+      return { ok: true, message: `规则 ${code} 草稿已保存`, refs: { ruleCode: code } };
+    },
+    publishRule(ruleCode) {
+      const rule = E.alarmRulesById[ruleCode];
+      if (!rule) return fail('规则不存在');
+      if (rule.status !== '草稿') return fail(`当前状态「${rule.status}」，只有草稿可发布`);
+      act('alarm/rule/publish', { ruleCode });
+      return { ok: true, message: `规则 ${ruleCode} 已发布`, refs: { ruleCode } };
+    },
+    disableRule(ruleCode) {
+      const rule = E.alarmRulesById[ruleCode];
+      if (!rule) return fail('规则不存在');
+      if (rule.status !== '已发布') return fail(`当前状态「${rule.status}」，不能停用`);
+      act('alarm/rule/disable', { ruleCode }, `alarm-rule-disable:${ruleCode}`);
+      return { ok: true, message: `规则 ${ruleCode} 已停用`, refs: { ruleCode } };
     },
 
     // ---------- 维修 ----------
@@ -166,7 +228,7 @@ export function createDemoActions(state, dispatch) {
     },
 
     // ---------- 备件 ----------
-    consumeSpare({ repairOrderId, spareCode, warehouseId, qty, requestId }) {
+    consumeSpare({ repairOrderId, spareCode, warehouseId, qty, requestId, person }) {
       const order = E.repairOrdersById[repairOrderId];
       if (!order) return fail('维修工单不存在');
       if (!['已派工', '维修中'].includes(order.status)) return fail(`工单状态「${order.status}」不允许领料出库`);
@@ -177,7 +239,7 @@ export function createDemoActions(state, dispatch) {
       if (E.idempotencyByKey[key]) {
         return { ok: true, idempotent: true, message: `重复提交已忽略（幂等）：${E.idempotencyByKey[key].message}`, refs: E.idempotencyByKey[key].refs || {} };
       }
-      act('spare/consume', { repairOrderId, spareCode, warehouseId, qty, requestId }, key);
+      act('spare/consume', { repairOrderId, spareCode, warehouseId, qty, requestId, person }, key);
       return { ok: true, message: `出库成功：${warehouseId} 可用库存 −${qty}，已生成维修出库单`, refs: { repairOrderId, spareCode } };
     },
     returnSpare({ outboundId, qty, reason, requestId }) {
@@ -224,7 +286,7 @@ export function createDemoActions(state, dispatch) {
       if (!cfg) return fail('速度配置不存在');
       if (!(idealSpeed > 0)) return fail('理想速度必须为正数');
       act('oee/saveSpeed', { configId, idealSpeed }, `speed:${configId}:v${(cfg.version || 1) + 1}`);
-      return { ok: true, message: `速度配置已保存（v${(cfg.version || 1) + 1}），已触发演示重算`, refs: { configId } };
+      return { ok: true, message: `速度配置已保存（v${(cfg.version || 1) + 1}），已触发 OEE 重算`, refs: { configId } };
     },
     saveOeeConfig(deviceId, target) {
       if (!(target > 0 && target <= 100)) return fail('OEE 目标必须为 0 ~ 100');
@@ -244,7 +306,7 @@ export function createDemoActions(state, dispatch) {
     },
     createExportTask(theme, filters) {
       act('report/createExport', { theme, filters });
-      return { ok: true, message: '演示导出任务已创建', refs: { theme } };
+      return { ok: true, message: '导出任务已创建', refs: { theme } };
     },
 
     // ---------- 大屏 / 重置 ----------

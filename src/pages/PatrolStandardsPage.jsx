@@ -3,7 +3,6 @@ import { Card, Table, Button } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import { ArrowRight } from 'lucide-react';
 import PageHeader from '../components/PageHeader.jsx';
-import DataSourceBadge from '../components/DataSourceBadge.jsx';
 import DegradedBanner from '../components/DegradedBanner.jsx';
 import StatusTag from '../components/StatusTag.jsx';
 import EmptyState from '../components/EmptyState.jsx';
@@ -55,20 +54,19 @@ export default function PatrolStandardsPage() {
     <>
       <PageHeader
         title="巡检标准"
-        subtitle="巡检标准档案（标准即巡检线路的检查依据）· 点击行进入标准详情查看线路设备与项目清单 · 数据为演示快照"
-        actions={<DataSourceBadge meta={meta} />}
+        subtitle="巡检标准档案（标准即巡检线路的检查依据）· 点击行进入标准详情查看线路设备与项目清单"
       />
       <DegradedBanner meta={meta} />
       <Card size="small">
         <Table
           rowKey="code" size="small" columns={columns} dataSource={rows} scroll={{ x: 1200 }}
           onRow={(r) => ({ onClick: () => navigate(`/patrol-standards/detail?id=${encodeURIComponent(r.code)}`), style: { cursor: 'pointer' } })}
-          locale={{ emptyText: <EmptyState description="暂无巡检标准" reason="演示快照中无巡检标准数据" /> }}
+          locale={{ emptyText: <EmptyState description="暂无巡检标准" reason="暂无巡检标准数据" /> }}
           pagination={{ pageSize: 10, showTotal: t => `共 ${t} 条` }}
         />
       </Card>
       <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 4, color: '#8a97a3', fontSize: 12 }}>
-        <ArrowRight size={12} /> 巡检线路设备与项目关联在标准详情页展示（巡检项目清单为演示快照口径）
+        <ArrowRight size={12} /> 巡检线路设备与项目关联在标准详情页展示
       </div>
     </>
   );

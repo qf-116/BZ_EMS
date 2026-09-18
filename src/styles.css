@@ -1,22 +1,25 @@
 /* ============================================================
    东浩智创 · 设备管理系统标准版 —— 全局视觉层
-   设计基调：深青蓝品牌色 + 冷灰蓝底 + 柔和层叠投影
+   设计基调：科技蓝主色（蓝→青渐变）+ 清透冷白底 + 高饱和状态色
+   数字统一 Bahnschrift/DIN 质感（Windows 自带，离线可用）
    ============================================================ */
 
 :root {
-  --page-bg: #edf1f6;
+  --page-bg: #f4f7fb;
   --panel: #fff;
-  --line: #e3eaf0;
-  --ink: #182631;
-  --muted: #5d6b78;
-  --brand: #0e5a74;
-  --brand-bright: #0e7ea6;
-  --brand-deep: #0c2231;
-  --warn: #b45309;
-  --danger: #c62828;
-  --ok: #227b52;
-  --shadow-card: 0 1px 2px rgba(13, 38, 53, 0.04), 0 3px 14px rgba(13, 38, 53, 0.05);
-  --shadow-card-hover: 0 4px 10px rgba(13, 38, 53, 0.07), 0 12px 32px rgba(13, 38, 53, 0.10);
+  --line: #e6eaf2;
+  --ink: #1b2735;
+  --muted: #5f6e80;
+  --brand: #1668dc;
+  --brand-bright: #4096ff;
+  --brand-cyan: #00b8d4;
+  --brand-deep: #0b1526;
+  --warn: #d97706;
+  --danger: #dc2626;
+  --ok: #16a34a;
+  --font-num: Bahnschrift, 'Segoe UI', 'PingFang SC', 'HarmonyOS Sans SC', 'Microsoft YaHei', sans-serif;
+  --shadow-card: 0 1px 2px rgba(15, 34, 65, 0.04), 0 3px 14px rgba(15, 34, 65, 0.05);
+  --shadow-card-hover: 0 4px 10px rgba(15, 34, 65, 0.07), 0 12px 32px rgba(15, 34, 65, 0.10);
 }
 
 * { box-sizing: border-box; }
@@ -47,7 +50,7 @@ body {
 
 /* ---- 侧边栏：深色品牌渐变 ---- */
 .app-sider {
-  box-shadow: 4px 0 18px rgba(8, 26, 38, 0.18);
+  box-shadow: 4px 0 18px rgba(6, 16, 32, 0.22);
   z-index: 10;
   /* 菜单较多时侧边栏固定在视口内，不随页面整体滚动 */
   position: sticky;
@@ -59,7 +62,9 @@ body {
   min-height: 100%;
   display: flex;
   flex-direction: column;
-  background: linear-gradient(180deg, #0e2a3c 0%, #0c2231 42%, #0a1b28 100%);
+  background:
+    radial-gradient(ellipse 90% 26% at 0% 0%, rgba(0, 184, 212, 0.14), transparent),
+    linear-gradient(180deg, #101f38 0%, #0b1526 52%, #0a1322 100%);
 }
 .app-brand {
   height: 60px;
@@ -77,15 +82,15 @@ body {
   align-items: center;
   justify-content: center;
   border-radius: 9px;
-  background: linear-gradient(135deg, #0e7ea6, #0e5a74);
-  box-shadow: 0 3px 10px rgba(14, 126, 166, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  background: linear-gradient(135deg, #00b8d4, #1668dc);
+  box-shadow: 0 3px 12px rgba(22, 104, 220, 0.48), inset 0 1px 0 rgba(255, 255, 255, 0.22);
 }
-.app-brand-name { color: #f2f8fb; font-size: 14px; line-height: 1.2; letter-spacing: 0.5px; }
-.app-brand-sub { color: rgba(199, 221, 232, 0.55); font-size: 11px; font-weight: 400; letter-spacing: 0.3px; }
+.app-brand-name { color: #f2f6fc; font-size: 14px; line-height: 1.2; letter-spacing: 0.5px; }
+.app-brand-sub { color: rgba(180, 203, 231, 0.55); font-size: 11px; font-weight: 400; letter-spacing: 0.3px; }
 .app-sider-foot {
   margin-top: auto;
   padding: 12px 18px;
-  color: rgba(199, 221, 232, 0.42);
+  color: rgba(180, 203, 231, 0.42);
   font-size: 12px;
   border-top: 1px solid rgba(255, 255, 255, 0.06);
 }
@@ -125,8 +130,20 @@ body {
   margin-bottom: 4px;
 }
 .app-sider .ant-menu-item-selected {
-  background: linear-gradient(90deg, #0e6b8c, #0e5a74) !important;
-  box-shadow: 0 3px 10px rgba(14, 126, 166, 0.38), inset 0 1px 0 rgba(255, 255, 255, 0.14);
+  background: linear-gradient(90deg, #1a72e8, #1668dc) !important;
+  box-shadow: 0 3px 12px rgba(22, 104, 220, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.16);
+  position: relative;
+}
+.app-sider .ant-menu-item-selected::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 18%;
+  bottom: 18%;
+  width: 3px;
+  border-radius: 3px;
+  background: #4dd8ee;
+  box-shadow: 0 0 8px rgba(77, 216, 238, 0.8);
 }
 /* 收起态浮层菜单沿用深色即可，不需要圆角背景修正 */
 
@@ -158,8 +175,8 @@ body {
   transition: border-color 0.2s, box-shadow 0.2s;
 }
 .user-chip:hover {
-  border-color: #b8d2dd;
-  box-shadow: 0 2px 8px rgba(14, 90, 116, 0.12);
+  border-color: #b3ccf5;
+  box-shadow: 0 2px 8px rgba(22, 104, 220, 0.14);
 }
 .user-avatar {
   width: 26px;
@@ -168,7 +185,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #0e7ea6, #0e5a74);
+  background: linear-gradient(135deg, #00b8d4, #1668dc);
   color: #fff;
   font-size: 12px;
   font-weight: 600;
@@ -184,14 +201,14 @@ body {
   align-items: center;
   margin-bottom: 14px;
 }
-.page-title { margin: 0 !important; font-size: 20px !important; font-weight: 700 !important; }
+.page-title { margin: 0 !important; font-size: 20px !important; font-weight: 700 !important; letter-spacing: -0.2px; }
 .page-title::before {
   content: '';
   display: inline-block;
   width: 4px;
   height: 16px;
   border-radius: 2px;
-  background: linear-gradient(180deg, #0e7ea6, #0e5a74);
+  background: linear-gradient(180deg, #00b8d4, #1668dc);
   margin-right: 10px;
   vertical-align: -2px;
 }
@@ -216,7 +233,8 @@ body {
 .ant-card .ant-card-head-title { font-weight: 600; }
 
 /* ================= 指标块 ================= */
-.metric-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+/* 自适应铺满一行：无论 4/5/6 块指标都占满整行，不留右侧空白 */
+.metric-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; }
 .metric-tile {
   --tile: var(--brand);
   position: relative;
@@ -266,11 +284,12 @@ body {
   opacity: 0.85;
 }
 .metric-value {
-  font-size: 27px;
+  font-size: 28px;
   line-height: 1.25;
   font-weight: 700;
   margin-top: 5px;
   color: var(--ink);
+  font-family: var(--font-num);
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.3px;
 }
@@ -292,11 +311,51 @@ body {
 .list-actions { display: flex; gap: 6px; flex-wrap: wrap; }
 .rule-alert { margin-bottom: 12px; }
 
-/* 表格：去重线 + 斑马行柔和 */
+/* 表格：白底表头 + 品牌色顶线 + 重字重；行悬停浅蓝 */
 .ant-table-wrapper .ant-table {
   border-radius: 10px;
 }
-.ant-table-wrapper .ant-table-tbody > tr > td { border-bottom-color: #edf2f6; }
+.ant-table-wrapper .ant-table-thead > tr > th {
+  font-weight: 600;
+  color: #33445c;
+  box-shadow: inset 0 2px 0 rgba(22, 104, 220, 0.55);
+}
+.ant-table-wrapper .ant-table-tbody > tr > td { border-bottom-color: #eef2f7; }
+
+/* ---- Tabs：渐变滑块 + 悬停浅蓝底 ---- */
+.ant-tabs .ant-tabs-ink-bar {
+  background: linear-gradient(90deg, #00b8d4, #1668dc);
+  border-radius: 2px;
+  box-shadow: 0 0 8px rgba(22, 104, 220, 0.45);
+}
+.ant-tabs .ant-tabs-tab {
+  transition: color 0.2s, background-color 0.2s;
+  border-radius: 8px 8px 0 0;
+}
+.ant-tabs .ant-tabs-tab:hover { background: #f0f6ff; }
+.ant-tabs > .ant-tabs-nav .ant-tabs-tab + .ant-tabs-tab { margin-left: 4px; }
+.ant-tabs .ant-tabs-tab.ant-tabs-tab-active .ant-tabs-tab-btn {
+  font-weight: 600;
+  text-shadow: none;
+}
+
+/* ---- Descriptions：标签列浅蓝底 + 加重 ---- */
+.ant-descriptions-bordered .ant-descriptions-item-label {
+  background: #f7faff;
+  font-weight: 500;
+  color: #33445c;
+}
+.ant-descriptions-bordered .ant-descriptions-item-content {
+  border-inline-start: none;
+}
+
+/* ---- 实时监控指标行：圆角底色 + 悬停 ---- */
+.rt-metric {
+  border-radius: 6px;
+  padding: 3px 6px;
+  transition: background-color 0.2s;
+}
+.rt-metric:hover { background: #f7faff; }
 
 .quality-marks { display: flex; gap: 8px; flex-wrap: wrap; }
 .quality-mark {
@@ -482,7 +541,7 @@ body {
 .rt-figure span { font-size: 10px; color: var(--muted); letter-spacing: 0.4px; }
 .rt-info { flex: 1; min-width: 0; display: grid; gap: 5px; align-content: center; }
 .rt-info-row { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); }
-.rt-info-row b { font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; }
+.rt-info-row b { font-weight: 600; color: var(--ink); font-family: var(--font-num); font-variant-numeric: tabular-nums; }
 .rt-info-row b.warn { color: var(--danger); }
 .rt-metrics {
   margin: 0 12px;
@@ -498,7 +557,7 @@ body {
   padding: 3px 0;
 }
 .rt-metric .n { color: var(--muted); }
-.rt-metric .v { font-weight: 600; font-variant-numeric: tabular-nums; color: var(--ink); }
+.rt-metric .v { font-weight: 600; font-family: var(--font-num); font-variant-numeric: tabular-nums; color: var(--ink); }
 .rt-metric .u { color: var(--muted); font-size: 11px; min-width: 44px; }
 .rt-metric.over .n, .rt-metric.over .v { color: var(--danger); }
 .rt-foot {
@@ -520,7 +579,7 @@ body {
 
 /* ================= 响应式 ================= */
 @media (max-width: 1200px) {
-  .metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .metric-grid { grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
   .chart-card-grid { grid-template-columns: 1fr; }
   .detail-grid { grid-template-columns: 1fr; }
   .trend-facet { grid-template-columns: 1fr; }

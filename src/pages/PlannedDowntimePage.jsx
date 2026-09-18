@@ -6,7 +6,6 @@ import { useDemoState, useDemoActions } from '../state/DemoStore.jsx';
 import { selectOeeRecomputeLog, selectDowntime } from '../state/selectors.js';
 import { fmtMinutes } from '../domain/downtime.js';
 import PageHeader from '../components/PageHeader.jsx';
-import DataSourceBadge from '../components/DataSourceBadge.jsx';
 import DegradedBanner from '../components/DegradedBanner.jsx';
 
 // 计划停机管理：统一停机事实中类别为「计划停机 / 换模」的单据。
@@ -101,9 +100,6 @@ export default function PlannedDowntimePage() {
 
   return (
     <>
-      <div style={{ marginBottom: 8 }}>
-        <DataSourceBadge meta={state.meta} />
-      </div>
       <DegradedBanner meta={state.meta} />
       <PageHeader
         title="计划停机时间管理"
@@ -145,7 +141,7 @@ export default function PlannedDowntimePage() {
                 return (
                   <Space size={10}>
                     <a onClick={() => openEdit(r)}>编辑</a>
-                    <a style={{ color: '#c62828' }} onClick={() => handleDelete(r)}>删除</a>
+                    <a style={{ color: '#dc2626' }} onClick={() => handleDelete(r)}>删除</a>
                     <a onClick={() => { setCanceling(r); cancelForm.resetFields(); }}>取消</a>
                   </Space>
                 );
@@ -222,7 +218,7 @@ export default function PlannedDowntimePage() {
           <Form.Item
             name="reason" label="取消原因（留痕）"
             rules={[{ required: true, message: '取消必须填写原因' }]}
-            extra="演示口径：待执行单据取消后按登记原因处理并记录；已发生的停机（进行中/已结束）不可删除"
+            extra="待执行单据取消后按登记原因处理并记录；已发生的停机（进行中/已结束）不可删除"
           >
             <Input.TextArea rows={2} placeholder="请填写取消原因" />
           </Form.Item>

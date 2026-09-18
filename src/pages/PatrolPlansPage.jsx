@@ -1,8 +1,7 @@
 import React, { useMemo, useState } from 'react';
-import { Card, Table, Button, Space, Input, Select, Tag, Progress } from 'antd';
+import { Card, Table, Button, Space, Input, Select, Progress } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import PageHeader from '../components/PageHeader.jsx';
-import DataSourceBadge from '../components/DataSourceBadge.jsx';
 import DegradedBanner from '../components/DegradedBanner.jsx';
 import StatusTag from '../components/StatusTag.jsx';
 import EmptyState from '../components/EmptyState.jsx';
@@ -63,8 +62,7 @@ export default function PatrolPlansPage() {
     <>
       <PageHeader
         title="巡检计划"
-        subtitle={`巡检计划（按线路设备生成巡检任务）· 周期：${[...new Set(patrolPlans.map(r => r.cycle))].join('/')} · 数据为演示快照（更新于 ${meta.updatedAt}）`}
-        actions={<DataSourceBadge meta={meta} />}
+        subtitle={`巡检计划（按线路设备生成巡检任务）· 周期：${[...new Set(patrolPlans.map(r => r.cycle))].join('/')} · 数据更新于 ${meta.updatedAt}`}
       />
       <DegradedBanner meta={meta} />
       <Card size="small" style={{ marginBottom: 12 }}>
@@ -79,11 +77,10 @@ export default function PatrolPlansPage() {
         <Table
           rowKey="code" size="small" columns={columns} dataSource={list} scroll={{ x: 1650 }}
           onRow={(r) => ({ onClick: () => navigate(`/patrol-plans/detail?id=${encodeURIComponent(r.code)}`), style: { cursor: 'pointer' } })}
-          locale={{ emptyText: <EmptyState description="暂无巡检计划" reason={kw || status ? '当前筛选条件下没有巡检计划' : '演示快照中无巡检计划数据'} /> }}
+          locale={{ emptyText: <EmptyState description="暂无巡检计划" reason={kw || status ? '当前筛选条件下没有巡检计划' : '暂无巡检计划数据'} /> }}
           pagination={{ pageSize: 10, showTotal: t => `共 ${t} 条` }}
         />
       </Card>
-      <Tag style={{ marginTop: 8 }} color="default">说明：巡检计划的生成与闭环由点巡保养业务模块承接，本页为范围外演示模块</Tag>
     </>
   );
 }

@@ -9,15 +9,15 @@ export default function LoginPage({ onLogin }) {
   return (
     <div style={{
       minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
-      background: 'radial-gradient(ellipse 70% 50% at 20% 0%, rgba(30, 174, 218, 0.25), transparent), radial-gradient(ellipse 60% 45% at 85% 100%, rgba(14, 126, 166, 0.30), transparent), linear-gradient(160deg, #0e5a74 0%, #14506a 55%, #1d3d4f 100%)',
+      background: 'radial-gradient(ellipse 70% 50% at 20% 0%, rgba(0, 184, 212, 0.28), transparent), radial-gradient(ellipse 60% 45% at 85% 100%, rgba(64, 150, 255, 0.26), transparent), linear-gradient(160deg, #0d2a5c 0%, #122f66 55%, #182646 100%)',
     }}>
       <Card style={{ width: 380, borderRadius: 10 }} styles={{ body: { padding: '32px 32px 24px' } }}>
         <div style={{ textAlign: 'center', marginBottom: 20 }}>
           <span style={{
             display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
             width: 52, height: 52, borderRadius: 14,
-            background: 'linear-gradient(135deg, #0e7ea6, #0e5a74)',
-            boxShadow: '0 6px 16px rgba(14, 126, 166, 0.35)',
+            background: 'linear-gradient(135deg, #00b8d4, #1668dc)',
+            boxShadow: '0 6px 16px rgba(22, 104, 220, 0.38)',
           }}>
             <Truck color="#fff" size={26} />
           </span>
@@ -35,10 +35,10 @@ export default function LoginPage({ onLogin }) {
             <Checkbox>记住登录</Checkbox>
           </Form.Item>
           <Button type="primary" htmlType="submit" block>登录</Button>
-          <Button block style={{ marginTop: 10 }} onClick={onFinish}>一键演示登录</Button>
+          <Button block style={{ marginTop: 10 }} onClick={onFinish}>一键登录</Button>
         </Form>
         <Space style={{ marginTop: 16, width: '100%', justifyContent: 'center' }}>
-          <Tag>演示账号 admin / 123456</Tag>
+          <Tag>账号 admin / 123456</Tag>
         </Space>
       </Card>
     </div>

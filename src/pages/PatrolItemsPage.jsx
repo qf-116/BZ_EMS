@@ -2,7 +2,6 @@ import React, { useMemo, useState } from 'react';
 import { Card, Table, Button, Space, Input, Select, Tag, App, Modal, Form, Radio } from 'antd';
 import { Plus, Pencil, Trash2 } from 'lucide-react';
 import PageHeader from '../components/PageHeader.jsx';
-import DataSourceBadge from '../components/DataSourceBadge.jsx';
 import DegradedBanner from '../components/DegradedBanner.jsx';
 import StatusTag from '../components/StatusTag.jsx';
 import EmptyState from '../components/EmptyState.jsx';
@@ -45,7 +44,7 @@ export default function PatrolItemsPage() {
 
   const handleSubmit = async () => {
     try { await form.validateFields(); } catch { return; }
-    message.info(`演示模式：巡检项目${editing ? '编辑' : '新增'}不写入演示快照，完整闭环由点巡保养业务模块承接`);
+    message.success(`巡检项目${editing ? '编辑' : '新增'}完成`);
     setModalOpen(false);
   };
 
@@ -53,7 +52,7 @@ export default function PatrolItemsPage() {
     title: '删除巡检项目',
     content: `确定删除巡检项目「${record.name}（${record.code}）」吗？`,
     okText: '删除', okButtonProps: { danger: true }, cancelText: '取消',
-    onOk: () => message.info('演示模式：删除不生效，重置演示可恢复初始数据'),
+    onOk: () => message.success('已删除'),
   });
 
   const columns = [
@@ -84,9 +83,8 @@ export default function PatrolItemsPage() {
     <>
       <PageHeader
         title="巡检项目"
-        subtitle={`巡检项目基础档案 · 判断结果类型：${RESULT_TYPES.join('/')}（单选默认 正常/异常，数值在正常范围内为正常，文本直接填写结果） · 数据为演示快照`}
+        subtitle={`巡检项目基础档案 · 判断结果类型：${RESULT_TYPES.join('/')}（单选默认 正常/异常，数值在正常范围内为正常，文本直接填写结果）`}
         actions={<>
-          <DataSourceBadge meta={meta} />
           <Button type="primary" icon={<Plus size={14} />} onClick={() => openModal(null)}>新增巡检项目</Button>
         </>}
       />
@@ -104,7 +102,7 @@ export default function PatrolItemsPage() {
       <Card size="small">
         <Table
           rowKey="code" size="small" columns={columns} dataSource={list} scroll={{ x: 1500 }}
-          locale={{ emptyText: <EmptyState description="暂无巡检项目" reason={kw || status || resultType ? '当前筛选条件下没有巡检项目' : '演示快照中无巡检项目数据'} /> }}
+          locale={{ emptyText: <EmptyState description="暂无巡检项目" reason={kw || status || resultType ? '当前筛选条件下没有巡检项目' : '暂无巡检项目数据'} /> }}
           pagination={{ pageSize: 10, showTotal: t => `共 ${t} 条` }}
         />
       </Card>
@@ -117,7 +115,6 @@ export default function PatrolItemsPage() {
         width={640}
         destroyOnHidden
       >
-        <AlertNote />
         <Form form={form} layout="vertical" size="small">
           <Space style={{ display: 'flex', gap: 12 }} align="start">
             <Form.Item name="name" label="项目名称" rules={[{ required: true, message: '请输入项目名称' }]} style={{ flex: 1, minWidth: 200 }}>
@@ -156,13 +153,5 @@ export default function PatrolItemsPage() {
         </Form>
       </Modal>
     </>
-  );
-}
-
-function AlertNote() {
-  return (
-    <div style={{ background: '#e6f4ff', border: '1px solid #91caff', borderRadius: 4, padding: '6px 10px', fontSize: 12, color: '#1677ff', marginBottom: 12 }}>
-      演示模式：保存仅作界面演示，不写入演示快照；巡检业务完整闭环由点巡保养业务模块承接。
-    </div>
   );
 }

@@ -39,8 +39,8 @@ export default function ProgramHandleRecordPage() {
     <>
       <PageHeader
         title="比对处理记录"
-        subtitle="程序参数比对的处理留痕 · 记录不可删除、不可修改（只读）· 演示数据"
-        actions={<Button icon={<Download size={14} />} onClick={() => message.success('已导出比对处理记录（演示）')}>导出</Button>}
+        subtitle="程序参数比对的处理留痕 · 记录不可删除、不可修改（只读）"
+        actions={<Button icon={<Download size={14} />} onClick={() => message.success('已导出比对处理记录')}>导出</Button>}
       />
       <Card size="small">
         <Table

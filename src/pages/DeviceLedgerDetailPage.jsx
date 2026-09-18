@@ -1,22 +1,28 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Card, Descriptions, Tag, Button, Space, App, Alert, Tabs, Table } from 'antd';
-import { ArrowLeft } from 'lucide-react';
+import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { ArrowLeft, Printer } from 'lucide-react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import PageHeader from '../components/PageHeader.jsx';
 import StatusTag from '../components/StatusTag.jsx';
 import EmptyState from '../components/EmptyState.jsx';
-import DataSourceBadge from '../components/DataSourceBadge.jsx';
+import DegradedBanner from '../components/DegradedBanner.jsx';
+import MetricTile from '../components/MetricTile.jsx';
 import { useDemoState } from '../state/DemoStore.jsx';
-import { selectDevice, selectBinding, selectHealth } from '../state/selectors.js';
+import { selectDevice360 } from '../state/selectors.js';
 // 点检/保养/巡检为演示种子（完整闭环由点巡保养业务模块承接）；维修/报警来自演示状态机
 import { inspectionTaskDetails, inspectionTasks, maintenanceTasks, patrolTaskDetails, patrolPlanDevices, patrolTasks } from '../data/standardData.js';
+import { reportRows } from '../data/demoData.js';
 
+const QUALITY_COLOR = { GOOD: 'success', DELAYED: 'processing', NO_VALUE: 'warning', OFFLINE: 'error', BAD: 'error' };
+const QUALITY_LABEL = { GOOD: '正常', DELAYED: '延迟', NO_VALUE: '无值', OFFLINE: '离线', BAD: '异常' };
 const hint = { fontSize: 12, color: '#5d6b78', lineHeight: 1.8 };
 const dash = (v) => (v === null || v === undefined || v === '' ? '--' : v);
-const emptyText = (label) => <span style={{ color: '#8a97a3' }}>该设备暂无{label}（演示数据未覆盖）</span>;
+const emptyText = (label) => <span style={{ color: '#8a97a3' }}>该设备暂无{label}</span>;
 
-// 设备档案详情：/device-ledger/detail/:deviceId；兼容旧 query（deviceId / code=资产编码）。
-// 展示台账字段 + 关联绑定 / 监测编码 / OEE 资格；无效编号显示「未找到对象」，禁止回退第一条。
+// 设备详情（统一页面）：/device-ledger/detail/:deviceId；兼容旧 query（deviceId / monitorCode / code=资产编码）。
+// /device/:deviceId 与 /device-ledger/net-config 重定向到本页。
+// 栏目：基础信息 / 点检 / 巡检 / 保养 / 维修 / 联网配置（全设备）；联网设备另有 实时监测 / 状态与趋势 / 报警事件 / 生产记录。
 export default function DeviceLedgerDetailPage() {
   const { deviceId: deviceIdParam } = useParams();
   const [searchParams] = useSearchParams();
@@ -27,7 +33,7 @@ export default function DeviceLedgerDetailPage() {
 
   const deviceId = useMemo(() => {
     if (deviceIdParam && state.entities.devicesById[deviceIdParam]) return deviceIdParam;
-    const qDeviceId = searchParams.get('deviceId');
+    const qDeviceId = searchParams.get('deviceId') || searchParams.get('monitorCode');
     if (qDeviceId && state.entities.devicesById[qDeviceId]) return qDeviceId;
     const code = searchParams.get('code');
     if (code) {
@@ -37,53 +43,17 @@ export default function DeviceLedgerDetailPage() {
     return null;
   }, [deviceIdParam, searchParams, state]);
 
-  const device = useMemo(() => (deviceId ? selectDevice(state, deviceId) : null), [state, deviceId]);
-  const binding = useMemo(() => (deviceId ? selectBinding(state, deviceId) : null), [state, deviceId]);
-  const health = useMemo(() => (deviceId ? selectHealth(state, deviceId) : null), [state, deviceId]);
+  const d360 = useMemo(() => (deviceId ? selectDevice360(state, deviceId) : null), [state, deviceId]);
 
-  // ===== 关联业务记录 =====
-  // 点检/巡检/保养：演示种子按资产编码（assetCode）过滤，任务明细为最近一次任务的设备行，按最新任务补齐计划口径；
-  // 维修/报警：演示状态机数据，按 canonical deviceId 过滤，跨页联动。
-  const records = useMemo(() => {
-    if (!device) return null;
-    const code = device.assetCode;
-    const latestInspectionTask = [...inspectionTasks].sort((a, b) => (b.date + b.createTime).localeCompare(a.date + a.createTime))[0];
-    const inspectionRows = inspectionTaskDetails.filter(d => d.code === code).map(d => ({
-      key: `XJ-${d.code}`,
-      plan: latestInspectionTask?.plan || '--',
-      date: latestInspectionTask?.date || '--',
-      owner: latestInspectionTask?.owner || '--',
-      taskStatus: latestInspectionTask?.status || '--',
-      items: d.itemNames || '--', itemCount: d.itemTotal, checked: d.checked, unchecked: d.unchecked,
-      execTime: d.execTime || '', skipReason: d.skipReason || '',
-    }));
-    const maintenanceRows = maintenanceTasks.filter(t => (t.device || '').includes(code)).map(t => ({ key: t.code, ...t }));
-    const latestPatrolTask = [...patrolTasks].sort((a, b) => (b.date + b.createTime).localeCompare(a.date + a.createTime))[0];
-    const patrolRows = patrolTaskDetails.filter(d => d.code === code).map(d => ({
-      key: `XJ-P-${d.code}`,
-      plan: latestPatrolTask?.plan || '--',
-      date: latestPatrolTask?.date || '--',
-      owner: latestPatrolTask?.owner || '--',
-      taskStatus: latestPatrolTask?.status || '--',
-      standard: patrolPlanDevices.find(p => p.code === code)?.standard || '--',
-      items: d.itemNames || '--', itemCount: d.itemCount, checked: d.checked, unchecked: d.unchecked,
-      execTime: d.execTime || '', skipReason: d.skipReason || '',
-    }));
-    const repairReportRows = Object.values(state.entities.repairReportsById)
-      .filter(r => r.deviceId === device.deviceId).map(r => ({ key: r.reportId, ...r }));
-    const repairOrderRows = Object.values(state.entities.repairOrdersById)
-      .filter(r => r.deviceId === device.deviceId).map(r => ({ key: r.repairOrderId, ...r }));
-    const alarmRows = Object.values(state.entities.alarmEventsById)
-      .filter(a => a.deviceId === device.deviceId).map(a => ({ key: a.id, ...a }));
-    return { inspectionRows, maintenanceRows, patrolRows, repairReportRows, repairOrderRows, alarmRows };
-  }, [device, state]);
+  const [trendKey, setTrendKey] = useState(null);
+  const [activeTab, setActiveTab] = useState(searchParams.get('tab') || null);
 
-  if (!device) {
+  if (!d360) {
     const shown = deviceIdParam || searchParams.get('deviceId') || searchParams.get('code') || '未提供设备编号';
     return (
       <>
         <PageHeader
-          title="设备档案详情"
+          title="设备详情"
           subtitle={`未找到设备：${shown}`}
           actions={<Button icon={<ArrowLeft size={14} />} onClick={() => navigate('/device-ledger')}>返回列表</Button>}
         />
@@ -100,46 +70,249 @@ export default function DeviceLedgerDetailPage() {
     );
   }
 
+  const { device, binding, realtime, health, activeAlarms, repair, oee } = d360;
+  const hasBinding = !!binding;
+  const lifecycleOnly = device.lifecycleStatus !== '在用';
+
+  // ===== 关联业务记录 =====
+  // 点检/巡检/保养：演示种子按资产编码（assetCode）过滤，任务明细为最近一次任务的设备行，按最新任务补齐计划口径；
+  // 维修/报警：演示状态机数据，按 canonical deviceId 过滤，跨页联动。
+  const code = device.assetCode;
+  const latestInspectionTask = [...inspectionTasks].sort((a, b) => (b.date + b.createTime).localeCompare(a.date + a.createTime))[0];
+  const inspectionRows = inspectionTaskDetails.filter(d => d.code === code).map(d => ({
+    key: `XJ-${d.code}`,
+    plan: latestInspectionTask?.plan || '--',
+    date: latestInspectionTask?.date || '--',
+    owner: latestInspectionTask?.owner || '--',
+    taskStatus: latestInspectionTask?.status || '--',
+    items: d.itemNames || '--', itemCount: d.itemTotal, checked: d.checked, unchecked: d.unchecked,
+    execTime: d.execTime || '', skipReason: d.skipReason || '',
+  }));
+  const maintenanceRows = maintenanceTasks.filter(t => (t.device || '').includes(code)).map(t => ({ key: t.code, ...t }));
+  const latestPatrolTask = [...patrolTasks].sort((a, b) => (b.date + b.createTime).localeCompare(a.date + a.createTime))[0];
+  const patrolRows = patrolTaskDetails.filter(d => d.code === code).map(d => ({
+    key: `XJ-P-${d.code}`,
+    plan: latestPatrolTask?.plan || '--',
+    date: latestPatrolTask?.date || '--',
+    owner: latestPatrolTask?.owner || '--',
+    taskStatus: latestPatrolTask?.status || '--',
+    standard: patrolPlanDevices.find(p => p.code === code)?.standard || '--',
+    items: d.itemNames || '--', itemCount: d.itemCount, checked: d.checked, unchecked: d.unchecked,
+    execTime: d.execTime || '', skipReason: d.skipReason || '',
+  }));
+  const repairReportRows = Object.values(state.entities.repairReportsById)
+    .filter(r => r.deviceId === device.deviceId).map(r => ({ key: r.reportId, ...r }));
+  const repairOrderRows = Object.values(state.entities.repairOrdersById)
+    .filter(r => r.deviceId === device.deviceId).map(r => ({ key: r.repairOrderId, ...r }));
+  const alarmRows = Object.values(state.entities.alarmEventsById)
+    .filter(a => a.deviceId === device.deviceId).map(a => ({ key: a.id, ...a }));
+  // 生产记录：设备上报的生产结果（OEE 分析的生产数据来源），按设备名过滤
+  const productionRows = reportRows.production
+    .map((r, i) => ({ key: `PR-${r.device}-${r.date}-${i}`, ...r }))
+    .filter(r => r.device === device.name);
+
+  // 趋势：使用演示快照中的确定性趋势序列（trends[`${deviceId}|${metricCode}`]）
+  const trendEntries = Object.keys(state.entities.trends || {})
+    .filter(k => k.startsWith(`${device.deviceId}|`))
+    .map(k => ({ key: k, metricCode: k.split('|')[1], values: state.entities.trends[k] }));
+  const currentTrend = trendEntries.find(t => t.key === trendKey) || trendEntries[0] || null;
+
+  // ===== 接入状态徽标 =====
+  const accessTag = !hasBinding
+    ? <Tag>未接入监测</Tag>
+    : (lifecycleOnly
+      ? <Tag color="default">不参与监测</Tag>
+      : (health?.status === '数据中断' ? <Tag color="error">数据中断</Tag> : <Tag color="success">监测中</Tag>));
+
   const sourceItems = (binding?.items || []).filter(i => i.enabled);
+  const totalSelected = (binding?.items || [])
+    .reduce((s, i) => s + (i.enabled ? (i.metrics || []).filter(m => m.selected).length : 0), 0);
 
-  return (
-    <>
-      <PageHeader
-        title={`设备档案 · ${device.name}`}
-        subtitle={`资产编号：${device.assetCode} · 设备ID：${device.deviceId}`}
-        actions={(
-          <Space>
-            <DataSourceBadge meta={meta} />
-            <Button icon={<ArrowLeft size={14} />} onClick={() => navigate('/device-ledger')}>返回列表</Button>
-          </Space>
-        )}
+  const metricColumns = [
+    { title: '指标编码', dataIndex: 'metricCode', width: 160 },
+    { title: '指标名称', dataIndex: 'name', width: 120 },
+    { title: '来源设备', dataIndex: 'iotDeviceCode', width: 130, render: v => v || '--' },
+    { title: '值', dataIndex: 'value', width: 100, render: v => (v ?? '--') },
+    { title: '单位', dataIndex: 'unit', width: 80, render: v => v || '--' },
+    {
+      title: '质量码', dataIndex: 'qualityCode', width: 100,
+      render: v => <Tag color={QUALITY_COLOR[v] || 'default'}>{QUALITY_LABEL[v] || v || '--'}</Tag>,
+    },
+    { title: '采集时间', dataIndex: 'sourceTime', width: 140, render: v => v || '--' },
+    { title: '接收时间', dataIndex: 'receiveTime', width: 140, render: v => v || '--' },
+    { title: '指标版本', dataIndex: 'metricVersion', width: 90, render: v => v || '--' },
+  ];
+
+  // ===== Tab 结构：栏目顺序固定；联网设备追加监测类栏目，未联网设备到联网配置为止 =====
+  const tabItems = [];
+
+  // 基础信息：档案字段 + OEE 资格 + 设备二维码
+  tabItems.push({
+    key: 'base', label: '基础信息', children: (
+      <>
+        <Card size="small" style={{ marginBottom: 12 }} title="档案信息">
+          <Descriptions size="small" bordered column={3} labelStyle={{ width: 120 }}>
+            <Descriptions.Item label="资产编号">{device.assetCode}</Descriptions.Item>
+            <Descriptions.Item label="设备名称">{device.name}</Descriptions.Item>
+            <Descriptions.Item label="设备类型">{device.type || '--'}</Descriptions.Item>
+            <Descriptions.Item label="规格型号">{device.model || '--'}</Descriptions.Item>
+            <Descriptions.Item label="品牌">{device.brand || '--'}</Descriptions.Item>
+            <Descriptions.Item label="设备ID">{device.deviceId}</Descriptions.Item>
+            <Descriptions.Item label="监测编码">{device.monitorCode || '--'}</Descriptions.Item>
+            <Descriptions.Item label="绑定状态">
+              <StatusTag value={binding?.configStatus || '未配置'} tip={binding ? `绑定 v${binding.version}` : '未创建绑定'} />
+            </Descriptions.Item>
+            <Descriptions.Item label="生命周期"><StatusTag value={device.lifecycleStatus} /></Descriptions.Item>
+            <Descriptions.Item label="组织">{device.organizationId || '--'}</Descriptions.Item>
+            <Descriptions.Item label="车间">{device.workshopName || '--'}</Descriptions.Item>
+            <Descriptions.Item label="产线 / 工位">{[device.lineName, device.stationName].filter(Boolean).join(' / ') || '--'}</Descriptions.Item>
+            <Descriptions.Item label="位置">{device.location || '--'}</Descriptions.Item>
+            <Descriptions.Item label="设备负责人">{device.owner || '--'}</Descriptions.Item>
+            <Descriptions.Item label="启用日期">{device.enableDate || '--'}</Descriptions.Item>
+            <Descriptions.Item label="采购日期">{device.buyDate || '--'}</Descriptions.Item>
+            <Descriptions.Item label="资产编号（档案）">{device.assetNo || '--'}</Descriptions.Item>
+          </Descriptions>
+        </Card>
+        <Card size="small" style={{ marginBottom: 12 }} title="OEE 资格">
+          <Descriptions size="small" bordered column={3} labelStyle={{ width: 120 }}>
+            <Descriptions.Item label="是否纳入 OEE 分析">
+              <Tag color={device.oeeEligible ? 'success' : 'default'}>{device.oeeEligible ? '是' : '否'}</Tag>
+            </Descriptions.Item>
+            <Descriptions.Item label="绑定前提">
+              {binding?.configStatus === '已启用' ? <Tag color="success">绑定已启用</Tag> : <Tag color="default">绑定未启用</Tag>}
+            </Descriptions.Item>
+            <Descriptions.Item label="OEE 统计">
+              <Tag color={device.oeeEligible ? 'success' : 'default'}>{device.oeeEligible ? '是' : '否'}</Tag>
+            </Descriptions.Item>
+          </Descriptions>
+          <div style={hint}>纳入 OEE 分析的设备需绑定已启用并在 OEE 效率分析中维护理想速度与计划停机口径。</div>
+        </Card>
+        <Card size="small" title="设备二维码">
+          <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
+            <div style={{ width: 96, height: 96, background: 'repeating-conic-gradient(#202730 0% 25%, #fff 0% 50%) 50% / 10px 10px', borderRadius: 6 }} />
+            <div style={hint}>
+              <div>资产编号：{device.assetCode}</div>
+              <div>设备名称：{device.name}</div>
+              <div>规格型号：{device.model || '--'}</div>
+              <div>设备类型：{device.type || '--'}</div>
+              <div>车间 / 产线：{device.workshopName || '--'} / {device.lineName || '--'}</div>
+            </div>
+          </div>
+          <div style={{ marginTop: 12 }}>
+            <Button icon={<Printer size={14} />} onClick={() => message.info('已打印（38*68 mm 标签）')}>打印二维码</Button>
+          </div>
+        </Card>
+      </>
+    ),
+  });
+
+  tabItems.push({
+    key: 'inspection', label: '点检记录', children: (
+      <Table
+        rowKey="key" size="small" pagination={false}
+        dataSource={inspectionRows}
+        locale={{ emptyText: emptyText('点检记录') }}
+        columns={[
+          { title: '点检计划', dataIndex: 'plan', width: 180 },
+          { title: '任务日期', dataIndex: 'date', width: 100 },
+          { title: '任务状态', dataIndex: 'taskStatus', width: 90, render: (v) => <StatusTag value={v} /> },
+          { title: '点检项目', dataIndex: 'items' },
+          { title: '应检', dataIndex: 'itemCount', width: 70, align: 'center', render: dash },
+          { title: '已检', dataIndex: 'checked', width: 70, align: 'center', render: dash },
+          { title: '未检', dataIndex: 'unchecked', width: 70, align: 'center', render: (v) => (v > 0 ? <span style={{ color: '#cf1322' }}>{v}</span> : v) },
+          { title: '执行时间', dataIndex: 'execTime', width: 130, render: dash },
+          { title: '跳过原因', dataIndex: 'skipReason', render: dash },
+        ]}
       />
-      <Card size="small" style={{ marginBottom: 12 }}>
-        <div style={{ fontWeight: 600, marginBottom: 12 }}>基础信息</div>
-        <Descriptions size="small" bordered column={3} labelStyle={{ width: 120 }}>
-          <Descriptions.Item label="资产编号">{device.assetCode}</Descriptions.Item>
-          <Descriptions.Item label="设备名称">{device.name}</Descriptions.Item>
-          <Descriptions.Item label="设备类型">{device.type || '--'}</Descriptions.Item>
-          <Descriptions.Item label="规格型号">{device.model || '--'}</Descriptions.Item>
-          <Descriptions.Item label="品牌">{device.brand || '--'}</Descriptions.Item>
-          <Descriptions.Item label="设备ID">{device.deviceId}</Descriptions.Item>
-          <Descriptions.Item label="组织">{device.organizationId || '--'}</Descriptions.Item>
-          <Descriptions.Item label="车间">{device.workshopName || '--'}</Descriptions.Item>
-          <Descriptions.Item label="产线 / 工位">{[device.lineName, device.stationName].filter(Boolean).join(' / ') || '--'}</Descriptions.Item>
-          <Descriptions.Item label="生命周期"><StatusTag value={device.lifecycleStatus} /></Descriptions.Item>
-          <Descriptions.Item label="设备负责人">{device.owner || '--'}</Descriptions.Item>
-          <Descriptions.Item label="启用日期">{device.enableDate || '--'}</Descriptions.Item>
-          <Descriptions.Item label="采购日期">{device.buyDate || '--'}</Descriptions.Item>
-          <Descriptions.Item label="资产编号（档案）">{device.assetNo || '--'}</Descriptions.Item>
-          <Descriptions.Item label="OEE 统计">
-            <Tag color={device.oeeEligible ? 'success' : 'default'}>{device.oeeEligible ? '是' : '否'}</Tag>
-          </Descriptions.Item>
-        </Descriptions>
-      </Card>
+    ),
+  });
 
-      <Card size="small" style={{ marginBottom: 12 }} title="关联监测与绑定">
-        {binding ? (
-          <>
+  tabItems.push({
+    key: 'patrol', label: '巡检记录', children: (
+      <Table
+        rowKey="key" size="small" pagination={false}
+        dataSource={patrolRows}
+        locale={{ emptyText: emptyText('巡检记录') }}
+        columns={[
+          { title: '巡检计划', dataIndex: 'plan', width: 170 },
+          { title: '巡检标准', dataIndex: 'standard', width: 160, render: dash },
+          { title: '任务日期', dataIndex: 'date', width: 100 },
+          { title: '任务状态', dataIndex: 'taskStatus', width: 90, render: (v) => <StatusTag value={v} /> },
+          { title: '巡检项目', dataIndex: 'items' },
+          { title: '应检', dataIndex: 'itemCount', width: 70, align: 'center', render: dash },
+          { title: '已检', dataIndex: 'checked', width: 70, align: 'center', render: dash },
+          { title: '未检', dataIndex: 'unchecked', width: 70, align: 'center', render: (v) => (v > 0 ? <span style={{ color: '#cf1322' }}>{v}</span> : v) },
+          { title: '执行时间', dataIndex: 'execTime', width: 130, render: dash },
+          { title: '跳过原因', dataIndex: 'skipReason', render: dash },
+        ]}
+      />
+    ),
+  });
+
+  tabItems.push({
+    key: 'maintenance', label: '保养记录', children: (
+      <Table
+        rowKey="key" size="small" pagination={false}
+        dataSource={maintenanceRows}
+        locale={{ emptyText: emptyText('保养记录') }}
+        columns={[
+          { title: '任务编号', dataIndex: 'code', width: 150 },
+          { title: '保养计划', dataIndex: 'plan', width: 170 },
+          { title: '保养日期', dataIndex: 'date', width: 100 },
+          { title: '负责人', dataIndex: 'owner', width: 110, render: dash },
+          { title: '状态', dataIndex: 'status', width: 90, render: (v) => <StatusTag value={v} /> },
+          { title: '备注', dataIndex: 'remark', render: dash },
+        ]}
+      />
+    ),
+  });
+
+  tabItems.push({
+    key: 'repair', label: '维修记录', children: (
+      <>
+        <div style={{ fontWeight: 600, margin: '4px 0 8px' }}>报修登记（{repairReportRows.length}）</div>
+        <Table
+          rowKey="key" size="small" pagination={false} style={{ marginBottom: 12 }}
+          dataSource={repairReportRows}
+          locale={{ emptyText: emptyText('报修登记') }}
+          columns={[
+            { title: '报修编号', dataIndex: 'reportId', width: 150 },
+            { title: '报修标题', dataIndex: 'title' },
+            { title: '故障类型', dataIndex: 'faultType', width: 90, render: dash },
+            { title: '级别', dataIndex: 'level', width: 80, render: (v) => <StatusTag value={v} /> },
+            { title: '状态', dataIndex: 'status', width: 100, render: (v) => <StatusTag value={v} /> },
+            { title: '报修人', dataIndex: 'creator', width: 90, render: dash },
+            { title: '报修时间', dataIndex: 'createTime', width: 140, render: dash },
+          ]}
+        />
+        <div style={{ fontWeight: 600, margin: '4px 0 8px' }}>维修工单（{repairOrderRows.length}）</div>
+        <Table
+          rowKey="key" size="small" pagination={false}
+          dataSource={repairOrderRows}
+          locale={{ emptyText: emptyText('维修工单') }}
+          columns={[
+            {
+              title: '工单号', dataIndex: 'repairOrderId', width: 150,
+              render: (v, r) => <a onClick={() => navigate(`/repair-orders/${r.repairOrderId}`)}>{v}</a>,
+            },
+            { title: '工单标题', dataIndex: 'title' },
+            { title: '故障类型', dataIndex: 'faultType', width: 90, render: dash },
+            { title: '级别', dataIndex: 'level', width: 80, render: (v) => <StatusTag value={v} /> },
+            { title: '状态', dataIndex: 'status', width: 100, render: (v) => <StatusTag value={v} /> },
+            { title: '维修人', dataIndex: 'assignee', width: 90, render: dash },
+            { title: '创建时间', dataIndex: 'createdAt', width: 140, render: dash },
+          ]}
+        />
+        <div style={hint}>维修工单可在「维修管理」中派工 / 执行 / 验收；状态变化实时反映在本页与各业务页面。</div>
+      </>
+    ),
+  });
+
+  tabItems.push({
+    key: 'network', label: '联网配置', children: (
+      hasBinding ? (
+        <>
+          <Card size="small" style={{ marginBottom: 12 }} title="绑定与拉取">
             <Descriptions size="small" bordered column={3} labelStyle={{ width: 120 }}>
               <Descriptions.Item label="监测编码">{device.monitorCode}</Descriptions.Item>
               <Descriptions.Item label="绑定ID">{binding.bindingId}</Descriptions.Item>
@@ -150,196 +323,229 @@ export default function DeviceLedgerDetailPage() {
               <Descriptions.Item label="生效区间">{binding.effectiveFrom || '--'} 至 {binding.effectiveTo || '至今'}</Descriptions.Item>
               <Descriptions.Item label="拉取周期">{binding.pullCycleSec != null ? `${binding.pullCycleSec} 秒` : '--'}</Descriptions.Item>
               <Descriptions.Item label="最近拉取">{binding.lastPullTime || '--'}</Descriptions.Item>
+              <Descriptions.Item label="拉取失败次数">{binding.pullFailCount ?? '--'}</Descriptions.Item>
+              <Descriptions.Item label="待补偿样本">{binding.pendingCompensation ?? '--'}</Descriptions.Item>
+              <Descriptions.Item label="启用中的来源设备">{sourceItems.length} 个</Descriptions.Item>
             </Descriptions>
-            <div style={{ fontWeight: 600, margin: '12px 0 8px' }}>启用中的来源设备（{sourceItems.length}）</div>
-            <Descriptions size="small" bordered column={2} labelStyle={{ width: 120 }}>
-              {sourceItems.map(i => (
-                <Descriptions.Item key={i.iotDeviceId} label={i.role === 'main' ? '主设备' : (i.sensorType || '子传感器')}>
-                  <Space size={6}>
-                    <span>{i.iotDeviceCode}</span>
-                    <Tag>{(i.metrics || []).filter(m => m.selected).length} 项指标</Tag>
-                  </Space>
-                </Descriptions.Item>
-              ))}
+          </Card>
+          <Card size="small" style={{ marginBottom: 12 }} title="接入参数（平台维护 · 只读）">
+            <Descriptions column={3} size="small" bordered>
+              <Descriptions.Item label="协议">--</Descriptions.Item>
+              <Descriptions.Item label="网关">--</Descriptions.Item>
+              <Descriptions.Item label="IP">--</Descriptions.Item>
+              <Descriptions.Item label="端口">--</Descriptions.Item>
+              <Descriptions.Item label="点表">--</Descriptions.Item>
             </Descriptions>
-            <div style={hint}>绑定关系与指标选择在「联网配置 / 绑定总览」中维护；台账页只读展示。</div>
-          </>
-        ) : (
-          <Alert
-            type="info" showIcon
-            message="该设备尚未创建 IoT 绑定"
-            description="未绑定设备不参与运行监测、报警判定与 OEE 统计；可在绑定总览中创建首个绑定。"
+            <div style={hint}>
+              协议 / 网关 / IP / 端口 / 点表由 IoT 平台接入服务维护，本系统不存储也不展示具体值（-- 表示由平台管理，非未配置）。
+            </div>
+          </Card>
+          <Card size="small" title={`来源设备（主设备 + 子传感器 · 共 ${(binding.items || []).length} 个，已选指标 ${totalSelected} 项）`}>
+            <Table
+              rowKey="iotDeviceId" size="small" pagination={false}
+              dataSource={binding.items || []}
+              locale={{ emptyText: emptyText('来源设备') }}
+              columns={[
+                { title: '编码', dataIndex: 'iotDeviceCode', width: 140 },
+                { title: '角色', width: 110, render: (_, r) => (r.role === 'main' ? <Tag color="blue">主设备</Tag> : <Tag color="cyan">{r.sensorType || '子传感器'}</Tag>) },
+                { title: '启用', dataIndex: 'enabled', width: 90, render: v => <StatusTag value={v ? '已启用' : '已停用'} /> },
+                {
+                  title: '已选指标', render: (_, r) => (
+                    <Space size={4} wrap>
+                      {(r.metrics || []).filter(m => m.selected).map(m => (
+                        <Tag key={m.metricCode}>{m.metricCode}{m.metricVersion ? ` · ${m.metricVersion}` : ''}</Tag>
+                      ))}
+                      {(r.metrics || []).filter(m => m.selected).length === 0 && <span style={{ color: '#8a97a3', fontSize: 12 }}>--</span>}
+                    </Space>
+                  ),
+                },
+              ]}
+            />
+            <div style={hint}>
+              来源设备编码全局唯一（排他校验由绑定保存流程执行）；绑定关系与指标选择变更请前往「绑定总览」。
+            </div>
+            <div style={{ marginTop: 12 }}>
+              <Button onClick={() => navigate('/binding-overview')}>前往绑定总览</Button>
+            </div>
+          </Card>
+        </>
+      ) : (
+        <Card size="small">
+          <EmptyState
+            description="该设备尚未创建 IoT 绑定，未接入运行监测"
+            reason="未绑定设备不参与运行监测、报警判定与 OEE 统计"
+            next="前往绑定总览创建首个绑定"
+            onNext={() => navigate('/binding-overview')}
+            nextLabel="前往绑定总览"
           />
-        )}
-      </Card>
+        </Card>
+      )
+    ),
+  });
 
-      <Card size="small" style={{ marginBottom: 12 }} title="关联业务记录">
+  if (hasBinding) {
+    tabItems.push({
+      key: 'realtime', label: '实时监测', children: (
+        <>
+          <div className="metric-grid" style={{ marginBottom: 12 }}>
+            <MetricTile label="运行状态" value={lifecycleOnly ? null : realtime.runStatus || null} color="#1668dc" />
+            <MetricTile label="通信健康" value={lifecycleOnly ? null : health.status || null} color="#16a34a" />
+            <MetricTile label="数据延迟" value={health.latencySec ?? null} unit="s" color="#d97706" />
+            <MetricTile label="采集质量率" value={lifecycleOnly ? null : health.qualityRate || null} color="#1668dc" />
+            <MetricTile label="OEE（实时窗口）" value={oee && oee.oee != null ? oee.oee : null} unit={oee && oee.oee != null ? '%' : undefined} color="#16a34a" />
+          </div>
+          {oee && oee.oee == null && !lifecycleOnly && (
+            <Alert
+              type="info" showIcon style={{ marginBottom: 12 }}
+              message={`OEE 不可计算：${(oee.blockers || []).join('；') || '该窗口无生产数据'}`}
+            />
+          )}
+          <Card size="small" title={`实时指标样本（绑定 v${binding.version}）`}>
+            <Table
+              rowKey={r => `${r.iotDeviceCode}|${r.metricCode}`}
+              size="small" pagination={false}
+              dataSource={realtime.metrics}
+              columns={metricColumns}
+              locale={{ emptyText: <EmptyState description="该设备未配置启用的监测指标" reason="绑定指标未启用，可在绑定总览中调整" next="前往绑定总览" onNext={() => navigate('/binding-overview')} /> }}
+            />
+            {realtime.healthStatus === '数据中断' && (
+              <div style={hint}>
+                注：数据中断期间指标值显示 --（无数据 ≠ 0），最后样本时间 {health.lastSampleAt || '--'}。
+              </div>
+            )}
+          </Card>
+        </>
+      ),
+    });
+    tabItems.push({
+      key: 'trend', label: '状态与趋势', children: (
+        <>
+          {trendEntries.length === 0 ? (
+            <Card size="small">
+              <EmptyState
+                description="该设备暂无可展示的趋势序列"
+                reason={realtime.healthStatus === '数据中断' ? '设备数据中断，无有效样本序列' : '当前筛选条件下没有数据'}
+              />
+            </Card>
+          ) : (
+            <div className="trend-facet">
+              <Card
+                size="small"
+                title={`趋势 · ${currentTrend.metricCode}`}
+                extra={(
+                  <Space>
+                    {trendEntries.map(t => (
+                      <Button key={t.key} size="small" type={t.key === currentTrend.key ? 'primary' : 'default'} onClick={() => setTrendKey(t.key)}>
+                        {t.metricCode}
+                      </Button>
+                    ))}
+                  </Space>
+                )}
+              >
+                <ResponsiveContainer width="100%" height={220}>
+                  <LineChart data={currentTrend.values.map((v, i) => ({ i: `t${i + 1}`, v }))}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e8ea" />
+                    <XAxis dataKey="i" tick={{ fontSize: 10 }} />
+                    <YAxis tick={{ fontSize: 10 }} domain={['auto', 'auto']} />
+                    <Tooltip />
+                    <Line type="linear" dataKey="v" stroke="#1668dc" dot={false} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </Card>
+              <Card size="small" title="数据质量标记">
+                <div className="quality-marks">
+                  <span className="quality-mark">正常</span>
+                  <span className="quality-mark warn">延迟</span>
+                  <span className="quality-mark warn">补传</span>
+                  <span className="quality-mark danger">缺失</span>
+                </div>
+              </Card>
+            </div>
+          )}
+        </>
+      ),
+    });
+    tabItems.push({
+      key: 'alarm', label: '报警事件', children: (
+        <Card size="small" title="该设备报警事件">
+          <Table
+            rowKey="key" size="small" pagination={false}
+            locale={{ emptyText: <EmptyState description="该设备暂无报警事件" reason="报警由监测指标触发，已关闭事件可在报警中心查看全部" next="前往报警中心" onNext={() => navigate('/alarm-center')} nextLabel="前往报警中心" /> }}
+            dataSource={alarmRows}
+            columns={[
+              { title: '报警ID', dataIndex: 'id', width: 150 },
+              { title: '报警名称', dataIndex: 'name' },
+              { title: '级别', dataIndex: 'severity', width: 80, render: v => <StatusTag value={v} /> },
+              { title: '状态', dataIndex: 'status', width: 110, render: v => <StatusTag value={v} /> },
+              { title: '触发指标', dataIndex: 'metric', width: 100, render: dash },
+              { title: '触发值', dataIndex: 'trigger', width: 110, render: dash },
+              { title: '阈值', dataIndex: 'threshold', width: 140, ellipsis: true, render: dash },
+              { title: '触发时间', dataIndex: 'time', width: 100, render: dash },
+              { title: '持续时长', dataIndex: 'duration', width: 90, render: dash },
+              {
+                title: '操作', width: 80,
+                render: (_, r) => (r.status === '已关闭' ? null : <Button type="link" size="small" onClick={() => navigate('/alarm-center')}>去处理</Button>),
+              },
+            ]}
+          />
+        </Card>
+      ),
+    });
+    tabItems.push({
+      key: 'production', label: '生产记录', children: (
+        <Card size="small" title="生产结果记录（OEE 分析生产数据）">
+          <Table
+            rowKey="key" size="small" pagination={false}
+            dataSource={productionRows}
+            locale={{ emptyText: <EmptyState description="该设备暂无生产记录数据" reason="生产结果由设备上报产生，OEE 分析所需的生产数据将在此展示" /> }}
+            columns={[
+              { title: '日期', dataIndex: 'date', width: 120 },
+              { title: '产出', dataIndex: 'output', width: 90, align: 'center', render: dash },
+              { title: '加工数', dataIndex: 'processed', width: 90, align: 'center', render: dash },
+              { title: '合格', dataIndex: 'qualified', width: 90, align: 'center', render: dash },
+              { title: '不合格', dataIndex: 'unqualified', width: 90, align: 'center', render: (v) => (v > 0 ? <span style={{ color: '#cf1322' }}>{v}</span> : v) },
+              { title: '合格率', dataIndex: 'passRate', width: 100, align: 'center', render: dash },
+              { title: '加工节拍', dataIndex: 'beat', width: 110, render: dash },
+            ]}
+          />
+        </Card>
+      ),
+    });
+  }
+
+  return (
+    <>
+      <PageHeader
+        title={`${device.name} · ${device.assetCode}`}
+        subtitle={`${device.location || device.workshopName || '--'} · 生命周期 ${device.lifecycleStatus || '--'}`}
+        actions={(
+          <Space>
+            {accessTag}
+            <Button icon={<ArrowLeft size={14} />} onClick={() => navigate('/device-ledger')}>返回列表</Button>
+          </Space>
+        )}
+      />
+      <DegradedBanner meta={meta} />
+      {lifecycleOnly && (
         <Alert
           type="info" showIcon style={{ marginBottom: 12 }}
-          message="点检 / 巡检 / 保养记录来自演示种子数据（只读，完整闭环由点巡保养业务模块承接）；报修 / 维修工单 / 报警记录来自演示状态机，动作会实时联动到本页。"
+          message={`该设备生命周期状态为「${device.lifecycleStatus}」，不参与运行监测与 OEE 统计，以下仅展示台账与绑定信息。`}
         />
-        <Tabs
-          defaultActiveKey="inspection"
-          items={[
-            {
-              key: 'inspection', label: `点检记录（${records.inspectionRows.length}）`,
-              children: (
-                <Table
-                  rowKey="key" size="small" pagination={false}
-                  dataSource={records.inspectionRows}
-                  locale={{ emptyText: emptyText('点检记录') }}
-                  columns={[
-                    { title: '点检计划', dataIndex: 'plan', width: 180 },
-                    { title: '任务日期', dataIndex: 'date', width: 100 },
-                    { title: '任务状态', dataIndex: 'taskStatus', width: 90, render: (v) => <StatusTag value={v} /> },
-                    { title: '点检项目', dataIndex: 'items' },
-                    { title: '应检', dataIndex: 'itemCount', width: 70, align: 'center', render: dash },
-                    { title: '已检', dataIndex: 'checked', width: 70, align: 'center', render: dash },
-                    { title: '未检', dataIndex: 'unchecked', width: 70, align: 'center', render: (v) => (v > 0 ? <span style={{ color: '#cf1322' }}>{v}</span> : v) },
-                    { title: '执行时间', dataIndex: 'execTime', width: 130, render: dash },
-                    { title: '跳过原因', dataIndex: 'skipReason', render: dash },
-                  ]}
-                />
-              ),
-            },
-            {
-              key: 'maintenance', label: `保养记录（${records.maintenanceRows.length}）`,
-              children: (
-                <Table
-                  rowKey="key" size="small" pagination={false}
-                  dataSource={records.maintenanceRows}
-                  locale={{ emptyText: emptyText('保养记录') }}
-                  columns={[
-                    { title: '任务编号', dataIndex: 'code', width: 150 },
-                    { title: '保养计划', dataIndex: 'plan', width: 170 },
-                    { title: '保养日期', dataIndex: 'date', width: 100 },
-                    { title: '负责人', dataIndex: 'owner', width: 110, render: dash },
-                    { title: '状态', dataIndex: 'status', width: 90, render: (v) => <StatusTag value={v} /> },
-                    { title: '备注', dataIndex: 'remark', render: dash },
-                  ]}
-                />
-              ),
-            },
-            {
-              key: 'patrol', label: `巡检记录（${records.patrolRows.length}）`,
-              children: (
-                <Table
-                  rowKey="key" size="small" pagination={false}
-                  dataSource={records.patrolRows}
-                  locale={{ emptyText: emptyText('巡检记录') }}
-                  columns={[
-                    { title: '巡检计划', dataIndex: 'plan', width: 170 },
-                    { title: '巡检标准', dataIndex: 'standard', width: 160, render: dash },
-                    { title: '任务日期', dataIndex: 'date', width: 100 },
-                    { title: '任务状态', dataIndex: 'taskStatus', width: 90, render: (v) => <StatusTag value={v} /> },
-                    { title: '巡检项目', dataIndex: 'items' },
-                    { title: '应检', dataIndex: 'itemCount', width: 70, align: 'center', render: dash },
-                    { title: '已检', dataIndex: 'checked', width: 70, align: 'center', render: dash },
-                    { title: '未检', dataIndex: 'unchecked', width: 70, align: 'center', render: (v) => (v > 0 ? <span style={{ color: '#cf1322' }}>{v}</span> : v) },
-                    { title: '执行时间', dataIndex: 'execTime', width: 130, render: dash },
-                    { title: '跳过原因', dataIndex: 'skipReason', render: dash },
-                  ]}
-                />
-              ),
-            },
-            {
-              key: 'repair', label: `维修记录（${records.repairReportRows.length + records.repairOrderRows.length}）`,
-              children: (
-                <>
-                  <div style={{ fontWeight: 600, margin: '4px 0 8px' }}>报修登记（{records.repairReportRows.length}）</div>
-                  <Table
-                    rowKey="key" size="small" pagination={false} style={{ marginBottom: 12 }}
-                    dataSource={records.repairReportRows}
-                    locale={{ emptyText: emptyText('报修登记') }}
-                    columns={[
-                      { title: '报修编号', dataIndex: 'reportId', width: 150 },
-                      { title: '报修标题', dataIndex: 'title' },
-                      { title: '故障类型', dataIndex: 'faultType', width: 90, render: dash },
-                      { title: '级别', dataIndex: 'level', width: 80, render: (v) => <StatusTag value={v} /> },
-                      { title: '状态', dataIndex: 'status', width: 100, render: (v) => <StatusTag value={v} /> },
-                      { title: '报修人', dataIndex: 'creator', width: 90, render: dash },
-                      { title: '报修时间', dataIndex: 'createTime', width: 140, render: dash },
-                    ]}
-                  />
-                  <div style={{ fontWeight: 600, margin: '4px 0 8px' }}>维修工单（{records.repairOrderRows.length}）</div>
-                  <Table
-                    rowKey="key" size="small" pagination={false}
-                    dataSource={records.repairOrderRows}
-                    locale={{ emptyText: emptyText('维修工单') }}
-                    columns={[
-                      {
-                        title: '工单号', dataIndex: 'repairOrderId', width: 150,
-                        render: (v, r) => <a onClick={() => navigate(`/repair-orders/${r.repairOrderId}`)}>{v}</a>,
-                      },
-                      { title: '工单标题', dataIndex: 'title' },
-                      { title: '故障类型', dataIndex: 'faultType', width: 90, render: dash },
-                      { title: '级别', dataIndex: 'level', width: 80, render: (v) => <StatusTag value={v} /> },
-                      { title: '状态', dataIndex: 'status', width: 100, render: (v) => <StatusTag value={v} /> },
-                      { title: '维修人', dataIndex: 'assignee', width: 90, render: dash },
-                      { title: '创建时间', dataIndex: 'createdAt', width: 140, render: dash },
-                    ]}
-                  />
-                </>
-              ),
-            },
-            {
-              key: 'alarm', label: `报警记录（${records.alarmRows.length}）`,
-              children: (
-                <Table
-                  rowKey="key" size="small" pagination={false}
-                  dataSource={records.alarmRows}
-                  locale={{ emptyText: emptyText('报警记录') }}
-                  columns={[
-                    { title: '报警ID', dataIndex: 'id', width: 160 },
-                    { title: '报警名称', dataIndex: 'name' },
-                    { title: '级别', dataIndex: 'severity', width: 80, render: (v) => <StatusTag value={v} /> },
-                    { title: '状态', dataIndex: 'status', width: 110, render: (v) => <StatusTag value={v} /> },
-                    { title: '触发指标', dataIndex: 'metric', width: 100, render: dash },
-                    { title: '触发值', dataIndex: 'trigger', width: 100, render: dash },
-                    { title: '触发时间', dataIndex: 'time', width: 100, render: dash },
-                    { title: '持续时长', dataIndex: 'duration', width: 100, render: dash },
-                  ]}
-                />
-              ),
-            },
-          ]}
+      )}
+      {hasBinding && !lifecycleOnly && realtime.healthStatus === '数据中断' && (
+        <Alert
+          type="warning" showIcon style={{ marginBottom: 12 }}
+          message="该设备数据中断：所有指标无数据（无数据 ≠ 0）"
+          description={`最后样本 ${health.lastSampleAt || '--'}。可查看接入任务了解失败原因与下一步处理建议。`}
         />
-        <div style={hint}>维修工单可在「维修管理」中派工 / 执行 / 验收；状态变化实时反映在本页与各业务页面。</div>
-      </Card>
+      )}
 
-      <Card size="small" style={{ marginBottom: 12 }} title="OEE 资格">
-        <Descriptions size="small" bordered column={3} labelStyle={{ width: 120 }}>
-          <Descriptions.Item label="是否纳入 OEE 分析">
-            <Tag color={device.oeeEligible ? 'success' : 'default'}>{device.oeeEligible ? '是' : '否'}</Tag>
-          </Descriptions.Item>
-          <Descriptions.Item label="绑定前提">
-            {binding?.configStatus === '已启用' ? <Tag color="success">绑定已启用</Tag> : <Tag color="default">绑定未启用</Tag>}
-          </Descriptions.Item>
-          <Descriptions.Item label="说明">
-            纳入 OEE 分析的设备需绑定已启用并在 OEE 效率分析中维护理想速度与计划停机口径
-          </Descriptions.Item>
-        </Descriptions>
-      </Card>
-
-      <Card size="small" title="设备二维码">
-        <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
-          <div style={{ width: 96, height: 96, background: 'repeating-conic-gradient(#202730 0% 25%, #fff 0% 50%) 50% / 10px 10px', borderRadius: 6 }} />
-          <div style={hint}>
-            <div>资产编号：{device.assetCode}</div>
-            <div>设备名称：{device.name}</div>
-            <div>规格型号：{device.model || '--'}</div>
-            <div>设备类型：{device.type || '--'}</div>
-            <div>车间 / 产线：{device.workshopName || '--'} / {device.lineName || '--'}</div>
-          </div>
-        </div>
-      </Card>
-      <div style={{ textAlign: 'center', marginTop: 16 }}>
-        <Space>
-          <Button onClick={() => message.info('已打印（38*68 mm 标签，演示）')}>打印二维码</Button>
-          <Button onClick={() => navigate(`/device-ledger/detail/${device.deviceId}`)}>刷新</Button>
-          <Button onClick={() => navigate('/device-ledger')}>关闭</Button>
-        </Space>
-      </div>
+      <Tabs
+        defaultActiveKey="base"
+        activeKey={activeTab || undefined}
+        onChange={setActiveTab}
+        items={tabItems}
+      />
     </>
   );
 }

@@ -1,7 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { Card, Table, Tag, Button, Space, Input, Select, Tooltip } from 'antd';
 import PageHeader from '../components/PageHeader.jsx';
-import DataSourceBadge from '../components/DataSourceBadge.jsx';
 import DegradedBanner from '../components/DegradedBanner.jsx';
 import StatusTag from '../components/StatusTag.jsx';
 import EmptyState from '../components/EmptyState.jsx';
@@ -41,7 +40,6 @@ export default function RepairOrdersPage() {
       <PageHeader
         title="维修任务"
         subtitle={`维修主工单（报修与维修统一对象）· 状态：${statusOptions.map(o => o.value).join('/') || '--'} · SLA 按等级自动带出（紧急 ${SLA_HOURS['紧急']}h / 严重 ${SLA_HOURS['严重']}h / 一般 ${SLA_HOURS['一般']}h） · 按创建时间倒序`}
-        actions={<DataSourceBadge meta={meta} />}
       />
       <DegradedBanner meta={meta} />
       <Card size="small" style={{ marginBottom: 12 }}>

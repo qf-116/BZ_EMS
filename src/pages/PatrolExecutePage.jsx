@@ -1,9 +1,8 @@
 import React, { useMemo, useState } from 'react';
-import { Card, Descriptions, Table, Button, Alert, Tag, Input, InputNumber, Radio, App } from 'antd';
+import { Card, Descriptions, Table, Button, Tag, Input, InputNumber, Radio, App } from 'antd';
 import { ArrowLeft, CheckCircle2 } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import PageHeader from '../components/PageHeader.jsx';
-import DataSourceBadge from '../components/DataSourceBadge.jsx';
 import DegradedBanner from '../components/DegradedBanner.jsx';
 import StatusTag from '../components/StatusTag.jsx';
 import EmptyState from '../components/EmptyState.jsx';
@@ -43,7 +42,7 @@ export default function PatrolExecutePage() {
           actions={<Button icon={<ArrowLeft size={14} />} onClick={() => navigate('/patrol-tasks')}>返回列表</Button>}
         />
         <Card size="small">
-          <EmptyState description={`未找到巡检任务${id ? `（${id}）` : ''}`} reason="任务编号无效或该任务不在演示快照中" />
+          <EmptyState description={`未找到巡检任务${id ? `（${id}）` : ''}`} reason="任务编号无效或不存在该任务" />
         </Card>
       </>
     );
@@ -59,11 +58,11 @@ export default function PatrolExecutePage() {
     }
     modal.confirm({
       title: '提交巡检结果',
-      content: '演示模式：完整闭环由点巡保养业务模块承接，提交不会写入演示快照；执行状态仅在本页演示更新。',
+      content: '确认提交巡检结果？',
       okText: '确认提交', cancelText: '取消',
       onOk: () => {
         setExecStatus('已完成');
-        message.success('巡检结果已提交（演示口径）：任务状态更新为已完成，完整闭环由点巡保养业务模块承接');
+        message.success('巡检结果已提交：任务状态更新为已完成');
       },
     });
   };
@@ -135,18 +134,10 @@ export default function PatrolExecutePage() {
     <>
       <PageHeader
         title={`巡检执行 · ${task.code}`}
-        subtitle={`巡检线路（计划）：${task.plan || '--'} · 巡检日期 ${task.date || '--'} · 执行状态在本页演示更新，不写入演示快照`}
-        actions={<>
-          <DataSourceBadge meta={meta} />
-          <Button icon={<ArrowLeft size={14} />} onClick={() => navigate('/patrol-tasks')}>返回列表</Button>
-        </>}
+        subtitle={`巡检线路（计划）：${task.plan || '--'} · 巡检日期 ${task.date || '--'}`}
+        actions={<Button icon={<ArrowLeft size={14} />} onClick={() => navigate('/patrol-tasks')}>返回列表</Button>}
       />
       <DegradedBanner meta={meta} />
-      <Alert
-        type="warning" showIcon style={{ marginBottom: 12 }}
-        message="演示模式：完整闭环由点巡保养业务模块承接"
-        description="本页为范围外演示模块的执行界面演示：逐项填写巡检结果后提交，仅更新本页演示状态，不写入演示快照、不生成维修工单/整改任务。"
-      />
       <Card size="small" style={{ marginBottom: 12 }}>
         <Descriptions column={3} size="small">
           <Descriptions.Item label="任务编号">{task.code}</Descriptions.Item>
@@ -166,7 +157,7 @@ export default function PatrolExecutePage() {
           rowKey="code" size="small" columns={columns}
           dataSource={patrolExecItems}
           pagination={false}
-          locale={{ emptyText: <EmptyState description="暂无待执行巡检项" reason="演示快照中未包含该任务的巡检项" /> }}
+          locale={{ emptyText: <EmptyState description="暂无待执行巡检项" reason="暂无该任务的巡检项" /> }}
         />
         <div style={{ marginTop: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span style={{ fontSize: 12, color: '#8a97a3' }}>判断结果类型：单选（选项判定）/ 数值（正常范围 {patrolExecItems.find(i => i.resultType === '数值')?.normalValue || '--'}）/ 文本（直接填写）</span>

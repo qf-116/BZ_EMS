@@ -4,7 +4,6 @@ import { Inbox, PackageOpen } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import PageHeader from '../components/PageHeader.jsx';
 import StatusTag from '../components/StatusTag.jsx';
-import DataSourceBadge from '../components/DataSourceBadge.jsx';
 import DegradedBanner from '../components/DegradedBanner.jsx';
 import { useDemoState } from '../state/DemoStore.jsx';
 import { selectStockRows } from '../state/selectors.js';
@@ -55,8 +54,7 @@ export default function SparePartsStockPage() {
     <>
       <PageHeader
         title="备件库存总览"
-        subtitle="库存口径：可用 = 在库 − 预留 · 数据来自演示快照（仓库 × 备件） · 低于安全库存自动标红预警"
-        actions={<DataSourceBadge meta={state.meta} />}
+        subtitle="库存口径：可用 = 在库 − 预留 · 低于安全库存自动标红预警"
       />
       <DegradedBanner meta={state.meta} />
       <Card size="small" style={{ marginBottom: 12 }}>
@@ -80,13 +78,11 @@ export default function SparePartsStockPage() {
           <Button onClick={() => { setKeyword(''); setWarehouseId(null); }}>重置</Button>
         </Space>
       </Card>
-      <Card size="small" style={{ marginBottom: 12 }}>
-        <Space wrap>
+      <Card size="small">
+        <Space wrap style={{ marginBottom: 12 }}>
           <Button type="primary" icon={<Inbox size={14} />} onClick={() => navigate('/spare-parts-inbound')}>到货入库</Button>
           <Button type="primary" icon={<PackageOpen size={14} />} onClick={() => navigate('/spare-parts-outbound')}>维修领料出库</Button>
         </Space>
-      </Card>
-      <Card size="small">
         {lowStockCount > 0 && (
           <Typography.Text type="danger" style={{ display: 'block', marginBottom: 8 }}>
             {lowStockCount} 条库存低于安全库存，请及时补货（入库入口：到货入库）。

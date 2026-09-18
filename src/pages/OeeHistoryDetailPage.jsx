@@ -6,7 +6,6 @@ import {
   selectOeeResult, selectOeeLosses, selectMttrMtbf, selectAllDevices,
 } from '../state/selectors.js';
 import PageHeader from '../components/PageHeader.jsx';
-import DataSourceBadge from '../components/DataSourceBadge.jsx';
 import DegradedBanner from '../components/DegradedBanner.jsx';
 
 // 历史 OEE 日明细：路由 /oee-history/detail/:deviceId（兼容旧 /oee-history/detail?device=xxx）。
@@ -94,9 +93,6 @@ export default function OeeHistoryDetailPage() {
 
   return (
     <>
-      <div style={{ marginBottom: 8 }}>
-        <DataSourceBadge meta={state.meta} />
-      </div>
       <DegradedBanner meta={state.meta} />
       <PageHeader
         title="历史 OEE 详情"

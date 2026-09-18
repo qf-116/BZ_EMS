@@ -15,7 +15,7 @@ import { downtimeFacts } from './downtime.js';
 import { materialPool, speedConfigs, oeeTargets, shiftCalendar, oeeInputs, oeeEligibility, oeeRecomputeLog } from './oee.js';
 import { programCompare, programBaselines, programHandles } from './programCompare.js';
 
-export const STORE_VERSION = 3; // 快照结构版本：不兼容时回初始快照并提示
+export const STORE_VERSION = 4; // 快照结构版本：样本新增来源归属，不兼容时回初始快照并提示
 
 export const DEMO_META = {
   mode: 'demo',

@@ -63,11 +63,14 @@ export function selectRealtime(state, deviceId) {
   const binding = selectBinding(state, deviceId);
   const health = selectHealth(state, deviceId);
   const samples = Object.values(state.entities.samplesByKey).filter(s => s.deviceId === deviceId);
+  const disconnected = state.meta.provider === 'disconnect' || health.status === '数据中断';
   const metricRows = (binding?.items || [])
     .filter(i => i.enabled)
     .flatMap(i => (i.metrics || []).filter(m => m.selected).map(m => {
       const def = state.entities.metricsByKey[m.metricCode];
-      const sample = samples.find(s => s.metricCode === m.metricCode);
+      const sample = disconnected
+        ? null
+        : samples.find(s => s.sourceId === i.iotDeviceId && s.metricCode === m.metricCode);
       return {
         metricCode: m.metricCode,
         name: def?.name || m.metricCode,
@@ -80,7 +83,10 @@ export function selectRealtime(state, deviceId) {
         metricVersion: m.metricVersion,
       };
     }));
-  const stateSample = samples.find(s => s.metricCode === 'S.machine_state');
+  const mainItem = (binding?.items || []).find(i => i.enabled && i.role === 'main');
+  const stateSample = disconnected
+    ? null
+    : samples.find(s => s.sourceId === mainItem?.iotDeviceId && s.metricCode === 'S.machine_state');
   return {
     deviceId,
     bindingStatus: binding?.configStatus || '未配置',
@@ -90,7 +96,7 @@ export function selectRealtime(state, deviceId) {
     sourceTime: stateSample?.sourceTime || null,
     receiveTime: stateSample?.receiveTime || null,
     lastSampleAt: health.lastSampleAt,
-    degraded: state.meta.degraded,
+    degraded: disconnected,
     provider: state.meta.provider,
     metrics: metricRows,
   };
@@ -229,7 +235,9 @@ export function selectOeeResult(state, deviceId, { window = 'realtime', day = nu
   const health = selectHealth(state, deviceId);
 
   const config = {
-    hasBinding: binding?.configStatus === '已启用' && health.status !== '数据中断',
+    hasBinding: binding?.configStatus === '已启用'
+      && health.status !== '数据中断'
+      && state.meta.provider !== 'disconnect',
     hasShiftCalendar: (state.entities.shiftCalendar || []).length > 0 && eligibility.hasShiftCalendar !== false,
     idealSpeed: null,
   };
@@ -250,7 +258,8 @@ export function selectOeeResult(state, deviceId, { window = 'realtime', day = nu
     if (!Number.isNaN(toMs)) plannedWindow = { fromMs: toMs - 60 * 60000, toMs };
   }
   const plannedDowntimeMinutesValue = plannedDowntimeMinutes(state, deviceId, plannedWindow);
-  const result = computeOee({
+  const blockers = oeeBlockers({ ...raw }, config);
+  const result = blockers.length ? { availability: null, performance: null, quality: null, oee: null } : computeOee({
     loadMinutes: raw.loadMinutes,
     plannedDowntimeMinutes: plannedDowntimeMinutesValue,
     runMinutes: raw.runMinutes,
@@ -260,7 +269,6 @@ export function selectOeeResult(state, deviceId, { window = 'realtime', day = nu
     output: raw.output,
     qualified: raw.qualified,
   });
-  const blockers = oeeBlockers({ ...raw }, config);
   return {
     deviceId, window, day: day || state.meta.demoDay,
     ...result,

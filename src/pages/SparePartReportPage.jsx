@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { Card, Table, Tag, Button, Space, Collapse, Select, Input, Alert } from 'antd';
+import { Card, Table, Tag, Button, Space, Select, Input, Alert, DatePicker } from 'antd';
+import dayjs from 'dayjs';
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { Download, Search } from 'lucide-react';
 import { App } from 'antd';
@@ -7,12 +8,13 @@ import PageHeader from '../components/PageHeader.jsx';
 import MetricTile from '../components/MetricTile.jsx';
 import StatusTag from '../components/StatusTag.jsx';
 import EmptyState from '../components/EmptyState.jsx';
-import DataSourceBadge from '../components/DataSourceBadge.jsx';
 import DegradedBanner from '../components/DegradedBanner.jsx';
 import { useDemoState, useDemoActions } from '../state/DemoStore.jsx';
 import { selectStockRows, selectExportTasks } from '../state/selectors.js';
 
 const THEME = 'sparepart';
+
+const { RangePicker } = DatePicker;
 
 const fmt = v => (v === null || v === undefined || v === '' ? '--' : v);
 
@@ -25,20 +27,30 @@ export default function SparePartReportPage() {
   const actions = useDemoActions();
   const meta = state.meta;
 
-  // UI 层筛选：备件名称 / 库存水位
+  // UI 层筛选：备件名称 / 库存水位 / 统计日期范围
   const [keyword, setKeyword] = useState('');
   const [level, setLevel] = useState('all');
+  const [range, setRange] = useState(null);
+
+  // 日期范围过滤助手（按前 10 位日期字符串比较）
+  const inRange = (d) => {
+    if (!range || !range[0] || !range[1]) return true;
+    if (!d) return false;
+    const s = String(d).slice(0, 10);
+    return s >= range[0].format('YYYY-MM-DD') && s <= range[1].format('YYYY-MM-DD');
+  };
 
   const stockRows = useMemo(() => selectStockRows(state), [state]);
   const outbounds = useMemo(() => Object.values(state.entities.outboundsById), [state]);
   const returns = useMemo(() => Object.values(state.entities.returnsById), [state]);
   const inbounds = useMemo(() => Object.values(state.entities.inboundsById), [state]);
 
-  // 出库 / 入库 / 退库按备件编码累计
+  // 出库 / 入库 / 退库按备件编码累计（统计日期范围：按单据日期过滤后再聚合）
   const flowBySpare = useMemo(() => {
     const acc = {};
     const ensure = code => (acc[code] = acc[code] || { outboundQty: 0, outboundCount: 0, returnQty: 0, inboundQty: 0 });
     for (const ob of outbounds) {
+      if (!inRange(ob.date)) continue;
       for (const item of ob.items || []) {
         const f = ensure(item.spareCode);
         f.outboundQty += item.qty || 0;
@@ -46,14 +58,16 @@ export default function SparePartReportPage() {
       }
     }
     for (const rt of returns) {
+      if (!inRange(rt.date)) continue;
       ensure(rt.spareCode).returnQty += rt.qty || 0;
     }
     for (const ib of inbounds) {
       if (ib.status !== '已入库') continue;
+      if (!inRange(ib.date)) continue;
       for (const item of ib.items || []) ensure(item.spareCode).inboundQty += item.qty || 0;
     }
     return acc;
-  }, [outbounds, returns, inbounds]);
+  }, [outbounds, returns, inbounds, range]);
 
   // 按备件编码聚合各仓库库存
   const allRows = useMemo(() => {
@@ -113,13 +127,13 @@ export default function SparePartReportPage() {
     const res = actions.runReport(THEME, currentFilters);
     res.ok ? message.success(res.message) : message.error(res.message);
   };
-  const handleReset = () => { setKeyword(''); setLevel('all'); };
+  const handleReset = () => { setKeyword(''); setLevel('all'); setRange(null); };
   const handleExport = () => {
     const res = actions.createExportTask(THEME, currentFilters);
     res.ok ? message.success(res.message) : message.error(res.message);
   };
   const handleDownload = (task) => {
-    message.info(`演示导出：任务 ${task.exportId} 为演示口径快照（口径截止 ${task.statsCutoff || '--'}），未生成真实文件`);
+    message.success(`导出任务 ${task.exportId} 已创建`);
   };
 
   const chartData = rows.map(r => ({ name: r.name, available: r.available, safe: r.safe ?? 0 }));
@@ -146,51 +160,48 @@ export default function SparePartReportPage() {
     <>
       <PageHeader
         title="备件管理统计报表"
-        subtitle={`库存水位 · 出入库 / 退库累计 · 低于安全库存预警 · 演示日 ${meta.demoDay || '--'} · 口径截止 ${meta.lastSampleAt || '--'}`}
+        subtitle={`库存水位 · 出入库 / 退库累计 · 低于安全库存预警 · 口径截止 ${meta.lastSampleAt || '--'}`}
         actions={<Button type="primary" icon={<Download size={14} />} onClick={handleExport}>导出</Button>}
       />
-      <div style={{ marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
-        <DataSourceBadge meta={meta} />
-      </div>
       <DegradedBanner meta={meta} />
-      <Collapse
-        size="small"
-        defaultActiveKey={['filters']}
-        style={{ marginBottom: 12 }}
-        items={[{
-          key: 'filters',
-          label: '筛选条件（备件 / 库存水位，仅作用于本页查询）',
-          children: (
-            <Space wrap>
-              <Input.Search
-                value={keyword}
-                onChange={e => setKeyword(e.target.value)}
-                onSearch={setKeyword}
-                placeholder="备件名称 / 编码"
-                style={{ width: 180 }}
-                allowClear
-              />
-              <Select value={level} onChange={setLevel} style={{ width: 150 }} options={[{ value: 'all', label: '全部水位' }, ...levelOptions]} />
-              <Button type="primary" icon={<Search size={14} />} onClick={handleQuery}>查询</Button>
-              <Button onClick={handleReset}>重置</Button>
-            </Space>
-          ),
-        }]}
-      />
+      <Card size="small" style={{ marginBottom: 12 }}>
+        <Space wrap>
+          <RangePicker
+            style={{ width: 250 }} allowClear
+            value={range} onChange={setRange}
+            presets={[
+              { label: '最近7天', value: [dayjs().subtract(6, 'day'), dayjs()] },
+              { label: '最近30天', value: [dayjs().subtract(29, 'day'), dayjs()] },
+            ]}
+            placeholder={['开始日期', '结束日期']}
+          />
+          <Input.Search
+            value={keyword}
+            onChange={e => setKeyword(e.target.value)}
+            onSearch={setKeyword}
+            placeholder="备件名称 / 编码"
+            style={{ width: 180 }}
+            allowClear
+          />
+          <Select value={level} onChange={setLevel} style={{ width: 150 }} options={[{ value: 'all', label: '全部水位' }, ...levelOptions]} />
+          <Button type="primary" icon={<Search size={14} />} onClick={handleQuery}>查询</Button>
+          <Button onClick={handleReset}>重置</Button>
+        </Space>
+      </Card>
       <Alert
         className="rule-alert"
         type="info"
         showIcon
         style={{ marginBottom: 12 }}
-        message="口径：可用 = 现存 − 预留；库存水位按各仓库现存合计与安全 / 最大库存比较判定（低于安全库存自动联动备件库存报警）；出库 / 入库 / 退库为演示快照累计数。"
+        message="口径：可用 = 现存 − 预留；库存水位按各仓库现存合计与安全 / 最大库存比较判定（低于安全库存自动联动备件库存报警）。"
       />
       <div className="metric-grid" style={{ marginBottom: 12 }}>
         <MetricTile label="备件种类" value={rows.length} unit="种" />
-        <MetricTile label="低于安全库存" value={totals.low} unit="种" color="#b45309" />
-        <MetricTile label="超过最大库存" value={totals.over} unit="种" color="#c62828" />
-        <MetricTile label="入库累计" value={totals.inbound} color="#227b52" />
+        <MetricTile label="低于安全库存" value={totals.low} unit="种" color="#d97706" />
+        <MetricTile label="超过最大库存" value={totals.over} unit="种" color="#dc2626" />
+        <MetricTile label="入库累计" value={totals.inbound} color="#16a34a" />
         <MetricTile label="出库累计" value={totals.outbound} />
-        <MetricTile label="退库累计" value={totals.ret} color="#0e5a74" />
+        <MetricTile label="退库累计" value={totals.ret} color="#1668dc" />
         <MetricTile label="出库单数" value={totals.count} unit="单" />
       </div>
       {chartData.length > 0 && (
@@ -202,7 +213,7 @@ export default function SparePartReportPage() {
               <YAxis tick={{ fontSize: 10 }} allowDecimals={false} />
               <Tooltip formatter={v => `${v}`} />
               <Legend wrapperStyle={{ fontSize: 12 }} />
-              <Bar dataKey="available" name="可用库存" fill="#0e7ea6" barSize={18} radius={[3, 3, 0, 0]} />
+              <Bar dataKey="available" name="可用库存" fill="#00b8d4" barSize={18} radius={[3, 3, 0, 0]} />
               <Bar dataKey="safe" name="安全库存" fill="#c2cfd8" barSize={18} radius={[3, 3, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
@@ -211,7 +222,7 @@ export default function SparePartReportPage() {
       {rows.length === 0 ? (
         <EmptyState
           description="当前筛选条件下无备件统计行"
-          reason="演示快照中备件库存未覆盖所选名称 / 水位组合，调整筛选或重置后重试"
+          reason="当前筛选条件下没有数据，调整筛选后重试"
           next="重置筛选"
           nextLabel="重置筛选"
           onNext={handleReset}
@@ -222,7 +233,7 @@ export default function SparePartReportPage() {
         </Card>
       )}
       {exportTasks.length > 0 && (
-        <Card size="small" title="导出任务（异步任务，演示口径）" style={{ marginTop: 12 }}>
+        <Card size="small" title="导出任务" style={{ marginTop: 12 }}>
           <Table
             rowKey="exportId" size="small" pagination={false}
             dataSource={exportTasks}

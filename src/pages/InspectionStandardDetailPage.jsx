@@ -3,7 +3,6 @@ import { Card, Descriptions, Table, Button, Space, Tag } from 'antd';
 import { ArrowLeft } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import PageHeader from '../components/PageHeader.jsx';
-import DataSourceBadge from '../components/DataSourceBadge.jsx';
 import DegradedBanner from '../components/DegradedBanner.jsx';
 import StatusTag from '../components/StatusTag.jsx';
 import EmptyState from '../components/EmptyState.jsx';
@@ -37,12 +36,12 @@ export default function InspectionStandardDetailPage() {
     return (
       <>
         <PageHeader title="点检标准详情" subtitle={codeOrId ? `标准：${codeOrId}` : '未指定标准'}
-          actions={<Space><DataSourceBadge meta={meta} /><Button icon={<ArrowLeft size={14} />} onClick={() => navigate('/inspection-standards')}>返回列表</Button></Space>} />
+          actions={<Space><Button icon={<ArrowLeft size={14} />} onClick={() => navigate('/inspection-standards')}>返回列表</Button></Space>} />
         <DegradedBanner meta={meta} />
         <Card size="small">
           <EmptyState
             description={`未找到点检标准${codeOrId ? `「${codeOrId}」` : ''}`}
-            reason="编号无效或演示快照中不存在该标准"
+            reason="编号无效或系统中不存在该标准"
             next
             onNext={() => navigate('/inspection-standards')}
             nextLabel="返回点检标准列表"
@@ -58,8 +57,8 @@ export default function InspectionStandardDetailPage() {
     <>
       <PageHeader
         title="点检标准详情"
-        subtitle={`标准：${standard.code} · ${standard.name} · 状态：${standard.status} · 演示快照（${meta.demoDay}）· 设备展示经 canonical 设备映射`}
-        actions={<Space><DataSourceBadge meta={meta} /><Button icon={<ArrowLeft size={14} />} onClick={() => navigate('/inspection-standards')}>返回列表</Button></Space>}
+        subtitle={`标准：${standard.code} · ${standard.name} · 状态：${standard.status} · 数据更新于 ${meta.demoDay} · 设备展示经 canonical 设备映射`}
+        actions={<Space><Button icon={<ArrowLeft size={14} />} onClick={() => navigate('/inspection-standards')}>返回列表</Button></Space>}
       />
       <DegradedBanner meta={meta} />
 
@@ -79,7 +78,7 @@ export default function InspectionStandardDetailPage() {
         <Table
           rowKey="code" size="small" pagination={false}
           dataSource={inspectionStandardDevices}
-          locale={{ emptyText: <EmptyState description="暂无关联设备" reason="演示快照未包含该标准的关联设备" /> }}
+          locale={{ emptyText: <EmptyState description="暂无关联设备" reason="该标准尚未关联设备" /> }}
           columns={[
             { title: '设备名称（canonical）', dataIndex: 'code', width: 220, render: (code) => {
               const c = canonOf(code);
@@ -99,7 +98,7 @@ export default function InspectionStandardDetailPage() {
         <Table
           rowKey="code" size="small" pagination={false}
           dataSource={items}
-          locale={{ emptyText: <EmptyState description="暂无关联点检项目" reason="演示快照未包含该标准的关联项目" /> }}
+          locale={{ emptyText: <EmptyState description="暂无关联点检项目" reason="该标准尚未关联点检项目" /> }}
           columns={[
             { title: '项目编号', dataIndex: 'code', width: 170 },
             { title: '项目名称', dataIndex: 'name', width: 180 },

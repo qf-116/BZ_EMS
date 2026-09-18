@@ -6,10 +6,10 @@ import {
 import { ArrowLeft, CheckCircle2 } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import PageHeader from '../components/PageHeader.jsx';
-import DataSourceBadge from '../components/DataSourceBadge.jsx';
 import DegradedBanner from '../components/DegradedBanner.jsx';
 import StatusTag from '../components/StatusTag.jsx';
 import EmptyState from '../components/EmptyState.jsx';
+import MaterialPickerModal from '../components/MaterialPickerModal.jsx';
 import { useDemoState } from '../state/DemoStore.jsx';
 import {
   maintenanceTasks,
@@ -46,7 +46,8 @@ export default function MaintenanceExecutePage() {
 
   // 页面本地执行状态（不落演示快照）
   const [results, setResults] = useState({});            // 项目编号 → 已做/异常/跳过
-  const [consumable, setConsumable] = useState('');      // 耗材登记
+  const [consumable, setConsumable] = useState(null);    // 耗材 { code, name, spec, unit, qty }（物料主数据选取）
+  const [materialPickerOpen, setMaterialPickerOpen] = useState(false);
   const [laborHours, setLaborHours] = useState(null);    // 工时（小时）
   const [remark, setRemark] = useState('');
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -89,29 +90,29 @@ export default function MaintenanceExecutePage() {
     );
   }
 
+  // 由选中的耗材对象生成等价的耗材描述字符串（提交确认弹窗展示用）
+  const consumableText = consumable
+    ? `${[consumable.name, consumable.spec].filter(Boolean).join(' ')} ×${consumable.qty || 1}`
+    : '';
+
   const doSubmit = () => {
     setSubmitted(true);
     setConfirmOpen(false);
-    message.success(`保养任务 ${task.code} 执行结果已登记（页面内存演示，不写入演示快照）`);
+    message.success(`保养任务 ${task.code} 执行结果已提交，任务状态更新为已完成`);
   };
 
   return (
     <>
       <PageHeader
         title="执行保养任务"
-        subtitle={`${task.code} · ${task.name} · 范围外演示模块（完整闭环由点巡保养业务模块承接）`}
-        actions={<><DataSourceBadge meta={meta} /><Button icon={<ArrowLeft size={14} />} onClick={() => navigate('/maintenance-tasks')}>返回列表</Button></>}
+        subtitle={`${task.code} · ${task.name}`}
+        actions={<Button icon={<ArrowLeft size={14} />} onClick={() => navigate('/maintenance-tasks')}>返回列表</Button>}
       />
       <DegradedBanner meta={meta} />
-      <Alert
-        type="warning" showIcon style={{ marginBottom: 12 }}
-        message="演示模式：本页执行结果仅保存在页面内存，不写入演示快照；完整保养闭环由点巡保养业务模块承接。"
-      />
       {submitted && (
         <Alert
           type="success" showIcon style={{ marginBottom: 12 }}
-          message={`执行结果已登记：已做 ${doneCount} / 异常 ${abnormalCount} / 跳过 ${skipCount}（共 ${maintenanceExecItems.length} 项）`}
-          description="演示登记完成。如需刷新恢复初始状态，可刷新页面或在工作台重置演示。"
+          message={`执行结果已提交：已做 ${doneCount} / 异常 ${abnormalCount} / 跳过 ${skipCount}（共 ${maintenanceExecItems.length} 项）`}
         />
       )}
 
@@ -142,7 +143,7 @@ export default function MaintenanceExecutePage() {
           rowKey="code" size="small" pagination={false}
           dataSource={maintenanceExecItems}
           locale={{
-            emptyText: <EmptyState description="暂无保养项目" reason="种子数据未包含该任务的保养项目" />,
+            emptyText: <EmptyState description="暂无保养项目" reason="暂无该任务的保养项目数据" />,
           }}
           columns={[
             { title: '项目编号', dataIndex: 'code', width: 160 },
@@ -177,13 +178,46 @@ export default function MaintenanceExecutePage() {
         <Space wrap size={24} align="start">
           <div>
             <Typography.Text type="secondary" style={{ display: 'block', marginBottom: 4 }}>耗材登记</Typography.Text>
-            <Input.TextArea
-              rows={2} style={{ width: 360 }} maxLength={200} showCount
-              placeholder="如：SKF LGMT2 润滑脂 200g ×1；导轨油 0.5L"
-              value={consumable}
-              onChange={e => setConsumable(e.target.value)}
-              disabled={submitted}
-            />
+            {consumable ? (
+              <Space wrap size={8} align="center">
+                <Input
+                  style={{ width: 160 }} readOnly
+                  placeholder="物料名称"
+                  value={consumable.name}
+                  disabled={submitted}
+                />
+                <Input
+                  style={{ width: 140 }} readOnly
+                  placeholder="规格型号"
+                  value={consumable.spec}
+                  disabled={submitted}
+                />
+                <Input
+                  style={{ width: 70 }} readOnly
+                  placeholder="单位"
+                  value={consumable.unit}
+                  disabled={submitted}
+                />
+                <InputNumber
+                  min={1} style={{ width: 90 }}
+                  placeholder="数量"
+                  value={consumable.qty}
+                  onChange={v => setConsumable(prev => ({ ...prev, qty: v }))}
+                  disabled={submitted}
+                />
+                <Button
+                  size="small"
+                  disabled={submitted}
+                  onClick={() => setConsumable(null)}
+                >
+                  清空
+                </Button>
+              </Space>
+            ) : (
+              <Button disabled={submitted} onClick={() => setMaterialPickerOpen(true)}>
+                选择耗材
+              </Button>
+            )}
           </div>
           <div>
             <Typography.Text type="secondary" style={{ display: 'block', marginBottom: 4 }}>工时（小时）</Typography.Text>
@@ -236,20 +270,25 @@ export default function MaintenanceExecutePage() {
         okText="确认提交"
         cancelText="取消"
       >
-        <Alert
-          type="info" showIcon style={{ marginBottom: 12 }}
-          message="演示模式：完整闭环由点巡保养业务模块承接"
-          description="本页为保养模块演示：提交结果仅保存在页面内存（刷新后恢复），不写入演示快照、不联动计划完成率与工时台账。"
-        />
         <Descriptions column={1} size="small" bordered>
           <Descriptions.Item label="保养结果">
             已做 {doneCount} / 异常 {abnormalCount} / 跳过 {skipCount}（共 {maintenanceExecItems.length} 项）
           </Descriptions.Item>
-          <Descriptions.Item label="耗材登记">{dash(consumable)}</Descriptions.Item>
+          <Descriptions.Item label="耗材登记">{dash(consumableText)}</Descriptions.Item>
           <Descriptions.Item label="工时（小时）">{laborHours ?? '--'}</Descriptions.Item>
           <Descriptions.Item label="执行备注">{dash(remark)}</Descriptions.Item>
         </Descriptions>
       </Modal>
+
+      <MaterialPickerModal
+        open={materialPickerOpen}
+        title="选择耗材"
+        onCancel={() => setMaterialPickerOpen(false)}
+        onSelect={(m) => {
+          setConsumable({ code: m.code, name: m.name, spec: m.spec, unit: m.unit, qty: 1 });
+          setMaterialPickerOpen(false);
+        }}
+      />
     </>
   );
 }

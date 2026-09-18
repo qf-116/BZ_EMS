@@ -1,15 +1,17 @@
 import React, { useMemo, useState } from 'react';
-import { Alert, App, Button, Card, Collapse, Select, Space, Table, Tag, Tooltip } from 'antd';
+import { Alert, App, Button, Card, DatePicker, Select, Space, Table, Tag, Tooltip } from 'antd';
+import dayjs from 'dayjs';
 import { Download, Search } from 'lucide-react';
 import PageHeader from '../components/PageHeader.jsx';
 import StatusTag from '../components/StatusTag.jsx';
 import EmptyState from '../components/EmptyState.jsx';
-import DataSourceBadge from '../components/DataSourceBadge.jsx';
 import DegradedBanner from '../components/DegradedBanner.jsx';
 import { useDemoState, useDemoActions } from '../state/DemoStore.jsx';
 import { selectOeeDailyRows, selectReportRows, selectExportTasks, selectAllDevices } from '../state/selectors.js';
 
 const THEME = 'comprehensive';
+
+const { RangePicker } = DatePicker;
 
 const fmt = v => (v === null || v === undefined || v === '' ? '--' : v);
 
@@ -28,8 +30,18 @@ export default function ComprehensiveReportPage() {
   const actions = useDemoActions();
   const meta = state.meta;
 
+  // UI 层筛选：统计日期范围、车间、设备
+  const [range, setRange] = useState(null);
   const [workshop, setWorkshop] = useState('all');
   const [device, setDevice] = useState('all');
+
+  // 演示快照仅有统计日（meta.demoDay）一个日期锚点：范围不含统计日时整表无数据（不伪造数据）
+  const inRange = (d) => {
+    if (!range || !range[0] || !range[1]) return true;
+    if (!d) return false;
+    const s = String(d).slice(0, 10);
+    return s >= range[0].format('YYYY-MM-DD') && s <= range[1].format('YYYY-MM-DD');
+  };
 
   const devices = useMemo(() => selectAllDevices(state), [state]);
   const workshopOf = useMemo(
@@ -63,11 +75,14 @@ export default function ComprehensiveReportPage() {
     return list;
   }, [oeeRows, compRows, compByName, state.entities.devicesById]);
 
-  const filteredRows = useMemo(() => rows.filter(r => {
-    if (device !== 'all' && r.name !== device) return false;
-    if (workshop !== 'all' && workshopOf[r.name] !== workshop) return false;
-    return true;
-  }), [rows, device, workshop, workshopOf]);
+  const filteredRows = useMemo(() => {
+    if (!inRange(meta.demoDay)) return [];
+    return rows.filter(r => {
+      if (device !== 'all' && r.name !== device) return false;
+      if (workshop !== 'all' && workshopOf[r.name] !== workshop) return false;
+      return true;
+    });
+  }, [rows, device, workshop, workshopOf, range, meta.demoDay]);
 
   const exportTasks = useMemo(
     () => selectExportTasks(state).filter(t => t.theme === THEME),
@@ -82,13 +97,13 @@ export default function ComprehensiveReportPage() {
     const res = actions.runReport(THEME, currentFilters);
     res.ok ? message.success(res.message) : message.error(res.message);
   };
-  const handleReset = () => { setWorkshop('all'); setDevice('all'); };
+  const handleReset = () => { setWorkshop('all'); setDevice('all'); setRange(null); };
   const handleExport = () => {
     const res = actions.createExportTask(THEME, currentFilters);
     res.ok ? message.success(res.message) : message.error(res.message);
   };
   const handleDownload = (task) => {
-    message.info(`演示导出：任务 ${task.exportId} 为演示口径快照（口径截止 ${task.statsCutoff || '--'}），未生成真实文件`);
+    message.success(`导出任务 ${task.exportId} 已创建`);
   };
 
   const columns = [
@@ -152,41 +167,38 @@ export default function ComprehensiveReportPage() {
     <>
       <PageHeader
         title="设备综合运行分析报表"
-        subtitle={`状态 · 稼动率 · OEE · 报警 · 质量 · 产出综合视图 · 演示日 ${meta.demoDay || '--'} · 口径截止 ${meta.lastSampleAt || '--'}`}
+        subtitle={`状态 · 稼动率 · OEE · 报警 · 质量 · 产出综合视图 · 统计日 ${meta.demoDay || '--'} · 口径截止 ${meta.lastSampleAt || '--'}`}
         actions={<Button type="primary" icon={<Download size={14} />} onClick={handleExport}>导出</Button>}
       />
-      <div style={{ marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
-        <DataSourceBadge meta={meta} />
-      </div>
       <DegradedBanner meta={meta} />
-      <Collapse
-        size="small"
-        defaultActiveKey={['filters']}
-        style={{ marginBottom: 12 }}
-        items={[{
-          key: 'filters',
-          label: '筛选条件（组织 / 设备，仅作用于本页查询）',
-          children: (
-            <Space wrap>
-              <Select value={workshop} onChange={setWorkshop} style={{ width: 140 }} options={[{ value: 'all', label: '全部车间' }, ...workshopOptions]} />
-              <Select value={device} onChange={setDevice} style={{ width: 170 }} showSearch optionFilterProp="label" options={[{ value: 'all', label: '全部设备' }, ...deviceOptions]} />
-              <Button type="primary" icon={<Search size={14} />} onClick={handleQuery}>查询</Button>
-              <Button onClick={handleReset}>重置</Button>
-            </Space>
-          ),
-        }]}
-      />
+      <Card size="small" style={{ marginBottom: 12 }}>
+        <Space wrap>
+          <RangePicker
+            style={{ width: 250 }} allowClear
+            value={range} onChange={setRange}
+            presets={[
+              { label: '最近7天', value: [dayjs().subtract(6, 'day'), dayjs()] },
+              { label: '最近30天', value: [dayjs().subtract(29, 'day'), dayjs()] },
+            ]}
+            placeholder={['开始日期', '结束日期']}
+          />
+          <Select value={workshop} onChange={setWorkshop} style={{ width: 140 }} options={[{ value: 'all', label: '全部车间' }, ...workshopOptions]} />
+          <Select value={device} onChange={setDevice} style={{ width: 170 }} showSearch optionFilterProp="label" options={[{ value: 'all', label: '全部设备' }, ...deviceOptions]} />
+          <Button type="primary" icon={<Search size={14} />} onClick={handleQuery}>查询</Button>
+          <Button onClick={handleReset}>重置</Button>
+        </Space>
+      </Card>
       <Alert
         className="rule-alert"
         type="info"
         showIcon
         style={{ marginBottom: 12 }}
-        message={`口径：OEE / 可用率 / 性能率 / 质量率为演示日 ${meta.demoDay || '--'} 的按天窗口结果（由生产输入 + 停机事实 + 速度配置推导，不可计算时显示 '--' 并悬浮说明原因）；运行状态 / 稼动率 / 报警 / 数据完整率 / 参数不一致数来自报表快照汇总。两路数据按设备合并，缺失列显示 '--'。`}
+        message={`口径：OEE / 可用率 / 性能率 / 质量率为统计日 ${meta.demoDay || '--'} 的按天窗口结果（由生产输入 + 停机事实 + 速度配置推导，不可计算时显示 '--' 并悬浮说明原因）；运行状态 / 稼动率 / 报警 / 数据完整率 / 参数不一致数来自报表快照汇总。两路数据按设备合并，缺失列显示 '--'。日期范围不含统计日时无数据。`}
       />
       {filteredRows.length === 0 ? (
         <EmptyState
           description="当前筛选条件下无综合分析行"
-          reason="演示快照中该设备既无按天生产数据，也无综合报表汇总行，调整筛选或重置后重试"
+          reason="当前筛选条件下没有数据，调整筛选后重试"
           next="重置筛选"
           nextLabel="重置筛选"
           onNext={handleReset}
@@ -195,7 +207,7 @@ export default function ComprehensiveReportPage() {
         <Table rowKey="key" size="small" scroll={{ x: 1500 }} dataSource={filteredRows} columns={columns} />
       )}
       {exportTasks.length > 0 && (
-        <Card size="small" title="导出任务（异步任务，演示口径）" style={{ marginTop: 12 }}>
+        <Card size="small" title="导出任务" style={{ marginTop: 12 }}>
           <Table
             rowKey="exportId" size="small" pagination={false}
             dataSource={exportTasks}

@@ -5,7 +5,6 @@ import { Search } from 'lucide-react';
 import { useDemoState } from '../state/DemoStore.jsx';
 import { selectOeeDailyRows, selectAllDevices } from '../state/selectors.js';
 import PageHeader from '../components/PageHeader.jsx';
-import DataSourceBadge from '../components/DataSourceBadge.jsx';
 import DegradedBanner from '../components/DegradedBanner.jsx';
 
 // 历史（日）OEE：数字全部来自 selectOeeDailyRows（window='daily'，默认 meta.demoDay = 2026-09-16）。
@@ -55,16 +54,13 @@ export default function OeeHistoryPage() {
     const color = v >= target ? 'success' : v >= 60 ? 'warning' : 'error';
     return (
       <Tooltip title={`目标 ${target}%：${v >= target ? '达标' : '未达标'} · 可用率 ${pctText(r.availability)} × 性能率 ${pctText(r.performance)} × 合格率 ${pctText(r.quality)}`}>
-        <span style={{ color: color === 'success' ? '#227b52' : color === 'warning' ? '#b45309' : '#c62828', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{v}%</span>
+        <span style={{ color: color === 'success' ? '#16a34a' : color === 'warning' ? '#d97706' : '#dc2626', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{v}%</span>
       </Tooltip>
     );
   };
 
   return (
     <>
-      <div style={{ marginBottom: 8 }}>
-        <DataSourceBadge meta={state.meta} />
-      </div>
       <DegradedBanner meta={state.meta} />
       <PageHeader
         title="历史 OEE"

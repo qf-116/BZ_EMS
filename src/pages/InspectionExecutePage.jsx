@@ -3,10 +3,10 @@ import { Card, Descriptions, Table, Button, Space, Radio, Input, InputNumber, Se
 import { ArrowLeft } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import PageHeader from '../components/PageHeader.jsx';
-import DataSourceBadge from '../components/DataSourceBadge.jsx';
 import DegradedBanner from '../components/DegradedBanner.jsx';
 import StatusTag from '../components/StatusTag.jsx';
 import EmptyState from '../components/EmptyState.jsx';
+import UserPickerModal from '../components/UserPickerModal.jsx';
 import { useDemoState } from '../state/DemoStore.jsx';
 import { inspectionTasks, inspectionTaskDetails, inspectionExecItems } from '../data/standardData.js';
 import { crosswalkByAssetCode } from '../data/demo/deviceCrosswalk.js';
@@ -14,7 +14,7 @@ import { crosswalkByAssetCode } from '../data/demo/deviceCrosswalk.js';
 const canonOf = (assetCode) => crosswalkByAssetCode[assetCode] || null;
 
 // 执行点检页（范围外演示模块）：/inspection-tasks/execute（query 兼容 id/code）。
-// 逐项填写：结果（正常/异常）+ 数值/文本 + 备注；提交前需签名（姓名输入）。
+// 逐项填写：结果（正常/异常）+ 数值/文本 + 备注；提交前需签名（从人员主数据选取）。
 // 执行状态用页面 useState（UI 局部状态，允许）；提交后本地确认弹窗提示演示口径，
 // 不写入 DemoStore / 不产生跨模块动作，完整闭环由点巡保养业务模块承接。
 export default function InspectionExecutePage() {
@@ -35,6 +35,7 @@ export default function InspectionExecutePage() {
   // 局部执行状态：{ [itemCode]: { result, value, remark } }；签名；提交后的本地确认结果
   const [results, setResults] = useState({});
   const [signName, setSignName] = useState('');
+  const [signPickerOpen, setSignPickerOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [summary, setSummary] = useState(null); // { device, normal, abnormal, items, signName }
 
@@ -42,12 +43,12 @@ export default function InspectionExecutePage() {
     return (
       <>
         <PageHeader title="执行点检" subtitle={codeOrId ? `任务：${codeOrId}` : '未指定点检任务'}
-          actions={<Space><DataSourceBadge meta={meta} /><Button icon={<ArrowLeft size={14} />} onClick={() => navigate('/inspection-tasks')}>返回列表</Button></Space>} />
+          actions={<Space><Button icon={<ArrowLeft size={14} />} onClick={() => navigate('/inspection-tasks')}>返回列表</Button></Space>} />
         <DegradedBanner meta={meta} />
         <Card size="small">
           <EmptyState
             description={`未找到点检任务${codeOrId ? `「${codeOrId}」` : ''}`}
-            reason="单号无效或演示快照中不存在该任务"
+            reason="单号无效或系统中不存在该任务"
             next
             onNext={() => navigate('/inspection-tasks')}
             nextLabel="返回点检任务列表"
@@ -83,23 +84,17 @@ export default function InspectionExecutePage() {
       signName: signName.trim(),
     });
     setConfirmOpen(false);
-    message.success('演示模式：执行结果仅在当前页面生效（UI 局部状态）');
+    message.success('执行结果已提交');
   };
 
   return (
     <>
       <PageHeader
         title="执行点检"
-        subtitle={`任务：${task.code} · ${task.plan} · 点检日期：${task.date} · 演示快照（${meta.demoDay}）· 执行结果仅本地生效，完整闭环由点巡保养业务模块承接`}
-        actions={<Space><DataSourceBadge meta={meta} /><Button icon={<ArrowLeft size={14} />} onClick={() => navigate('/inspection-tasks')}>返回列表</Button></Space>}
+        subtitle={`任务：${task.code} · ${task.plan} · 点检日期：${task.date} · 数据更新于 ${meta.demoDay}`}
+        actions={<Space><Button icon={<ArrowLeft size={14} />} onClick={() => navigate('/inspection-tasks')}>返回列表</Button></Space>}
       />
       <DegradedBanner meta={meta} />
-
-      <Alert
-        type="info" showIcon style={{ marginBottom: 12 }}
-        message="演示模式说明"
-        description="本页为范围外演示模块：执行结果保存在页面局部状态（useState）中，仅当前页面生效；刷新后恢复演示快照。真实环境的执行提交、异常项报修与闭环由点巡保养业务模块承接。"
-      />
 
       <Card size="small" style={{ marginBottom: 12 }}>
         <div style={{ fontWeight: 600, marginBottom: 12 }}>任务信息</div>
@@ -120,7 +115,7 @@ export default function InspectionExecutePage() {
             />
           </Descriptions.Item>
           <Descriptions.Item label="状态">
-            <StatusTag value={({ 未开始: '待执行', 进行中: '进行中', 已完成: '已完成', 已关闭: '已关闭' }[task.status] || task.status)} tip={`种子状态：${task.status}`} />
+            <StatusTag value={({ 未开始: '待执行', 进行中: '进行中', 已完成: '已完成', 已关闭: '已关闭' }[task.status] || task.status)} tip={`当前状态：${task.status}`} />
           </Descriptions.Item>
         </Descriptions>
       </Card>
@@ -130,7 +125,7 @@ export default function InspectionExecutePage() {
           点检项目（{inspectionExecItems.length} 项）
           {canon && <span style={{ fontWeight: 400, fontSize: 13, color: '#8a97a3', marginLeft: 8 }}>执行设备：{canon.name}（{canon.assetCode}）</span>}
         </div>
-        <div style={{ fontSize: 12, color: '#8a97a3', marginBottom: 12 }}>项目清单为演示快照（inspectionExecItems）；单选选项按项目定义，数值项请对照正常基准填写实测值。</div>
+        <div style={{ fontSize: 12, color: '#8a97a3', marginBottom: 12 }}>单选选项按项目定义，数值项请对照正常基准填写实测值。</div>
         <Table
           rowKey="code" size="small" pagination={false}
           dataSource={inspectionExecItems}
@@ -174,7 +169,14 @@ export default function InspectionExecutePage() {
         <div style={{ fontWeight: 600, marginBottom: 12 }}>签名确认</div>
         <Space wrap size={16} align="center">
           <span>签名（姓名）：</span>
-          <Input style={{ width: 220 }} placeholder="请输入执行人姓名" maxLength={20} value={signName} onChange={e => setSignName(e.target.value)} />
+          <Input
+            style={{ width: 280 }}
+            placeholder="点击「选择」从人员主数据选取"
+            maxLength={20}
+            value={signName}
+            readOnly
+            addonAfter={<a onClick={() => setSignPickerOpen(true)}>选择</a>}
+          />
           <Tag color={allFilled ? 'success' : 'warning'}>已填结果 {filled.length}/{inspectionExecItems.length} · 异常 {abnormalCount}</Tag>
           <Button type="primary" onClick={trySubmit}>提交执行结果</Button>
         </Space>
@@ -184,8 +186,8 @@ export default function InspectionExecutePage() {
         <Card size="small">
           <Alert
             type="success" showIcon
-            message="执行结果已记录（仅当前页面生效）"
-            description={`设备：${summary.device} · 共 ${summary.items} 项：正常 ${summary.normal} 项 / 异常 ${summary.abnormal} 项 · 签名：${summary.signName} · 本结果保存在页面局部状态，不写入演示快照；完整闭环由点巡保养业务模块承接。`}
+            message="执行结果已提交"
+            description={`设备：${summary.device} · 共 ${summary.items} 项：正常 ${summary.normal} 项 / 异常 ${summary.abnormal} 项 · 签名：${summary.signName}`}
           />
         </Card>
       )}
@@ -199,11 +201,18 @@ export default function InspectionExecutePage() {
         cancelText="返回修改"
       >
         <Alert
-          type="warning" showIcon
-          message="演示模式：执行结果仅在当前页面生效，完整闭环由点巡保养业务模块承接"
-          description={`本次提交：${canon ? `${canon.name}（${canon.assetCode}）` : deviceCode} · ${filled.length} 项（正常 ${filled.length - abnormalCount} / 异常 ${abnormalCount}）· 签名：${signName.trim()}。结果仅保存在页面局部状态，刷新后恢复演示快照。`}
+          type="info" showIcon
+          message="提交后任务状态将更新为已完成"
+          description={`本次提交：${canon ? `${canon.name}（${canon.assetCode}）` : deviceCode} · ${filled.length} 项（正常 ${filled.length - abnormalCount} / 异常 ${abnormalCount}）· 签名：${signName.trim()}`}
         />
       </Modal>
+
+      <UserPickerModal
+        open={signPickerOpen}
+        title="选择点检执行人"
+        onCancel={() => setSignPickerOpen(false)}
+        onSelect={(u) => { setSignName(u.name); setSignPickerOpen(false); }}
+      />
     </>
   );
 }

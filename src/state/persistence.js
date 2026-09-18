@@ -14,11 +14,11 @@ export function loadDemoState() {
     if (!raw) return { state: null, notice: null };
     const parsed = JSON.parse(raw);
     if (!parsed || parsed.version !== STORE_VERSION) {
-      return { state: null, notice: '演示快照版本已更新，已恢复初始剧本状态' };
+      return { state: null, notice: '本地快照版本已更新，已恢复初始状态' };
     }
     return { state: parsed, notice: null };
   } catch {
-    return { state: null, notice: '演示快照解析失败，已恢复初始剧本状态' };
+    return { state: null, notice: '本地快照解析失败，已恢复初始状态' };
   }
 }
 
