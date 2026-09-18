@@ -5,6 +5,7 @@
 import { BINDING_CONFIG_STATUS } from './device.js';
 
 // 绑定状态机：待配置 → 草稿 → 校验通过 → 待生效 → 已启用 →（已停用 / 换绑中）
+// 主/子角色由设备管理系统在绑定时指定（IoT 上报类型仅作参考）：每绑定恰好 1 个主设备，子设备可多个。
 export const BINDING_TRANSITIONS = {
   '未配置': ['草稿'],
   '草稿': ['校验中', '已停用'],
@@ -20,9 +21,10 @@ export function canTransitionBinding(from, to) {
   return (BINDING_TRANSITIONS[from] || []).includes(to);
 }
 
-// 校验一条绑定草稿：恰好 1 个主设备、至少 1 个启用项、主设备唯一启用、
-// 至少选择一项有效（未失效）指标、IoT 来源编码全局排他。
-// ctx: { sourceDevicesById, metricsByKey, activeIotCodesByOtherDevices: Set }
+// 校验一条绑定草稿：恰好 1 个主设备、至少 1 个启用项、
+// 至少选择一项有效（未失效）指标、同一绑定内来源编码不重复。
+// 说明：IoT 来源编码被其它设备占用仅作提示、不作为限制条件（业务允许多台设备绑定同一来源）。
+// ctx: { sourceDevicesById, metricsByKey }
 export function validateBindingDraft(draft, ctx = {}) {
   const errors = [];
   const items = draft.items || [];
@@ -30,10 +32,7 @@ export function validateBindingDraft(draft, ctx = {}) {
   if (enabled.length === 0) errors.push('至少保留一个启用的 IoT 来源设备');
   const mains = enabled.filter(i => i.role === 'main');
   if (mains.length !== 1) errors.push('必须恰好启用一个 IoT 主设备');
-  // IoT 来源编码排他：不能与其它设备活动绑定占用同一来源
   const codes = enabled.map(i => i.iotDeviceCode);
-  const occupied = (ctx.activeIotCodesByOtherDevices || new Set());
-  codes.forEach(c => { if (occupied.has(c)) errors.push(`IoT 来源编码 ${c} 已被其它设备占用`); });
   if (new Set(codes).size !== codes.length) errors.push('同一绑定内 IoT 来源编码重复');
   // 指标校验：启用项至少选择一项有效（未失效）指标
   const metricsByKey = ctx.metricsByKey || {};

@@ -91,13 +91,7 @@ export function reducer(state, action) {
     // ================= 绑定 =================
     case 'binding/validate': {
       const draft = payload.draft;
-      const occupied = new Set();
-      Object.values(E.bindingsByDeviceId).forEach(b => {
-        if (b.deviceId !== draft.deviceId && b.configStatus === '已启用') {
-          (b.items || []).forEach(i => { if (i.enabled) occupied.add(i.iotDeviceCode); });
-        }
-      });
-      const res = validateBindingDraft(draft, { metricsByKey: E.metricsByKey, activeIotCodesByOtherDevices: occupied });
+      const res = validateBindingDraft(draft, { metricsByKey: E.metricsByKey });
       return finish(state, action, res.ok, res.ok ? '校验通过：可以保存绑定草稿' : `校验未通过：${res.errors.join('；')}`, { errors: res.errors }, false, at);
     }
     case 'binding/addSource': {
@@ -118,6 +112,29 @@ export function reducer(state, action) {
       if (!draft) return reject(state, action, '没有进行中的绑定草稿');
       const next = { ...state, ui: { ...state.ui, bindingDraftsByDeviceId: setIn(drafts, key, { ...draft, items: draft.items.filter(i => i.iotDeviceId !== payload.iotDeviceId) }) } };
       return finish(next, action, true, '已从绑定草稿移除该来源（未保存）', {}, false, at);
+    }
+    case 'binding/setSourceRole': {
+      // 主/子角色由设备管理系统在绑定时指定：设为主设备时原主设备自动降为子设备（每绑定恰好 1 个主设备）
+      const key = `draft-${payload.deviceId}`;
+      const drafts = state.ui.bindingDraftsByDeviceId || {};
+      const draft = drafts[key];
+      if (!draft) return reject(state, action, '没有进行中的绑定草稿');
+      const role = payload.role === 'main' ? 'main' : 'sensor';
+      const items = draft.items.map(i => {
+        if (i.iotDeviceId === payload.iotDeviceId) {
+          return {
+            ...i, role,
+            kind: role === 'main' ? '主设备' : '子传感器',
+            sensorType: role === 'main' ? '--' : (i.sensorType && i.sensorType !== '--' ? i.sensorType : (i.name || '子传感器')),
+          };
+        }
+        if (role === 'main' && i.role === 'main') {
+          return { ...i, role: 'sensor', kind: '子传感器', sensorType: i.name || '子传感器' };
+        }
+        return i;
+      });
+      const next = { ...state, ui: { ...state.ui, bindingDraftsByDeviceId: setIn(drafts, key, { ...draft, items }) } };
+      return finish(next, action, true, role === 'main' ? '已设为主设备（原主设备已自动改为子设备）' : '已设为子设备', { deviceId: payload.deviceId }, false, at);
     }
     case 'binding/toggleMetric': {
       const key = `draft-${payload.deviceId}`;
@@ -202,16 +219,7 @@ export function reducer(state, action) {
       const b = E.bindingsByDeviceId[payload.deviceId];
       if (!b) return reject(state, action, '该设备尚未创建绑定');
       if (!canTransitionBinding(b.configStatus, '已启用')) return reject(state, action, `当前状态「${b.configStatus}」不能启用（状态机约束）`);
-      const occupied = new Set();
-      Object.values(E.bindingsByDeviceId).forEach(other => {
-        if (other.deviceId !== payload.deviceId && other.configStatus === '已启用') {
-          (other.items || []).forEach(i => { if (i.enabled) occupied.add(i.iotDeviceCode); });
-        }
-      });
-      const validation = validateBindingDraft(b, {
-        metricsByKey: E.metricsByKey,
-        activeIotCodesByOtherDevices: occupied,
-      });
+      const validation = validateBindingDraft(b, { metricsByKey: E.metricsByKey });
       if (!validation.ok) return reject(state, action, `绑定启用校验未通过：${validation.errors.join('；')}`);
       const updated = { ...b, configStatus: '已启用', effectiveFrom: at, effectiveTo: null };
       let next = setE(state, 'bindingsByDeviceId', payload.deviceId, updated);

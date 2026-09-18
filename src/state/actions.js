@@ -53,6 +53,12 @@ export function createDemoActions(state, dispatch) {
       act('binding/removeSource', { deviceId, iotDeviceId });
       return { ok: true, message: '已从绑定草稿移除（未保存）', refs: { deviceId } };
     },
+    // 指定来源角色（主设备/子设备）：IoT 上报类型不作判定依据，角色在绑定时由本系统指定；
+    // 设为主设备时原主设备自动降为子设备（每绑定恰好 1 个主设备，子设备可多个）
+    setBindingSourceRole(deviceId, iotDeviceId, role) {
+      act('binding/setSourceRole', { deviceId, iotDeviceId, role });
+      return { ok: true, message: role === 'main' ? '已设为主设备（原主设备已自动改为子设备）' : '已设为子设备', refs: { deviceId } };
+    },
     toggleBindingMetric(deviceId, iotDeviceId, metricCode) {
       act('binding/toggleMetric', { deviceId, iotDeviceId, metricCode });
       return { ok: true, message: '指标选择已切换（未保存）', refs: { deviceId } };

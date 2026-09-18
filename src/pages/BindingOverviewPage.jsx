@@ -4,7 +4,8 @@
 // 状态轴：未配置 → 草稿 → 校验 → 待生效 → 已启用 → 已停用/换绑中（domain/binding.js）。
 // DEV-008 故意未配置，用于演示「首次绑定」全流程：
 //   新建绑定（草稿走 store 的 bindingDraftsByDeviceId，页面不用 useState 存草稿）
-//   → 勾选数据源与指标 → 校验（validateBindingDraft：主数据源唯一 / IoT 编码全局唯一 / 失效指标）
+//   → 勾选数据源并指定主/子角色（主设备唯一）与指标 → 校验（validateBindingDraft：恰好 1 个主设备 / 至少 1 项有效指标 / 绑定内编码不重复；
+//     来源编码被其它设备占用仅提示不拦截）
 //   → 保存（binding-{deviceId}-NN 新版本，状态「待生效」）→ 启用。
 // 已启用设备可「停用」（填原因）；换绑说明见页尾文案。
 // ============================================================
@@ -24,7 +25,9 @@ import { validateBindingDraft } from '../domain/binding.js';
 
 const metricTagColor = (m) => (m.syncStatus === '已失效' ? 'error' : 'default');
 
-// ---------- 绑定草稿弹窗（两步向导：第 1 步选数据源 → 第 2 步选指标；草稿状态全部来自 store，不经页面 useState） ----------
+// ---------- 绑定草稿弹窗（两步向导：第 1 步选数据源并指定主/子角色 → 第 2 步选指标；草稿状态全部来自 store，不经页面 useState）
+// 角色由本系统在绑定时指定（IoT 上报类型不作判定依据）：每绑定恰好 1 个主设备，子设备可多个；
+// IoT 来源编码被其它设备占用仅提示、不限制绑定（domain/binding.js 校验同口径）。 ----------
 function BindingDraftModal({ deviceId, deviceName, open, onClose }) {
   const state = useDemoState();
   const actions = useDemoActions();
@@ -50,7 +53,7 @@ function BindingDraftModal({ deviceId, deviceName, open, onClose }) {
     if (open) { setStep(0); setValidateResult(null); setSourceKw(''); }
   }, [open, deviceId]);
 
-  // 校验上下文：其它设备已启用绑定占用的 IoT 来源编码（全局排他）
+  // 仅提示用：其它设备已启用绑定占用的 IoT 来源编码（不作为校验限制，允许重复绑定）
   const occupiedCodes = useMemo(() => {
     const set = new Set();
     Object.values(state.entities.bindingsByDeviceId).forEach((b) => {
@@ -73,7 +76,7 @@ function BindingDraftModal({ deviceId, deviceName, open, onClose }) {
 
   const doValidate = () => {
     if (!draft) { message.warning('请先勾选 IoT 数据源，生成绑定草稿'); return; }
-    const res = validateBindingDraft(draft, { metricsByKey: state.entities.metricsByKey, activeIotCodesByOtherDevices: occupiedCodes });
+    const res = validateBindingDraft(draft, { metricsByKey: state.entities.metricsByKey });
     setValidateResult(res);
     if (res.ok) message.success('校验通过：可以保存绑定草稿');
     else message.error(`校验未通过（${res.errors.length} 项）`);
@@ -81,7 +84,7 @@ function BindingDraftModal({ deviceId, deviceName, open, onClose }) {
 
   const doSave = () => {
     if (!draft) { message.warning('没有待保存的绑定草稿'); return; }
-    const res = validateBindingDraft(draft, { metricsByKey: state.entities.metricsByKey, activeIotCodesByOtherDevices: occupiedCodes });
+    const res = validateBindingDraft(draft, { metricsByKey: state.entities.metricsByKey });
     setValidateResult(res);
     if (!res.ok) { message.error('校验未通过，保存被拒绝：请先处理校验项'); return; }
     const r = actions.saveBinding(deviceId, `绑定草稿 v${draft.version}：${draftItems.length} 个来源 / ${metricCount} 项指标`);
@@ -153,7 +156,7 @@ function BindingDraftModal({ deviceId, deviceName, open, onClose }) {
       />
       {validateResult && step === 1 && (
         validateResult.ok ? (
-          <Alert type="success" showIcon style={{ marginBottom: 12 }} message="校验通过：恰好 1 个启用的主数据源、至少 1 项有效指标、IoT 来源编码无占用冲突。" />
+          <Alert type="success" showIcon style={{ marginBottom: 12 }} message="校验通过：恰好 1 个启用的主设备、至少 1 项有效指标、同一绑定内来源编码不重复。" />
         ) : (
           <Alert
             type="error" showIcon style={{ marginBottom: 12 }}
@@ -170,7 +173,7 @@ function BindingDraftModal({ deviceId, deviceName, open, onClose }) {
       {step === 0 && (
         <>
           <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginBottom: 6 }}>
-            第 1 步 · 勾选 IoT 数据源（主设备必须恰好启用 1 个；IoT 来源编码全局唯一，被其它设备占用时校验不通过）
+            第 1 步 · 勾选 IoT 数据源并指定角色（IoT 上报类型不作判定依据；每次绑定恰好 1 个主设备，子设备可多个）
           </Typography.Paragraph>
           <Input
             allowClear size="small" style={{ width: 260, marginBottom: 8 }}
@@ -178,7 +181,8 @@ function BindingDraftModal({ deviceId, deviceName, open, onClose }) {
           />
           <div style={{ border: '1px solid #eef1f4', borderRadius: 6, padding: '8px 12px', marginBottom: 12, maxHeight: 320, overflow: 'auto' }}>
             {sourceDevices.map((s) => {
-              const checked = draftItems.some((i) => i.iotDeviceId === s.iotDeviceId);
+              const item = draftItems.find((i) => i.iotDeviceId === s.iotDeviceId);
+              const checked = !!item;
               const occupied = occupiedCodes.has(s.iotDeviceCode);
               return (
                 <div key={s.iotDeviceId} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0' }}>
@@ -186,13 +190,14 @@ function BindingDraftModal({ deviceId, deviceName, open, onClose }) {
                     checked={checked}
                     onChange={(e) => {
                       if (e.target.checked) {
+                        // 角色不依据 IoT 上报类型判定：默认加入为子设备，由用户在此指定主/子
                         actions.addBindingSource(deviceId, {
                           iotDeviceId: s.iotDeviceId,
                           iotDeviceCode: s.iotDeviceCode,
                           name: s.name,
-                          role: s.kind === '主设备' ? 'main' : 'sensor',
-                          sensorType: s.kind === '主设备' ? '--' : s.name,
-                          kind: s.kind,
+                          role: 'sensor',
+                          sensorType: s.name,
+                          kind: '子传感器',
                           metrics: [],
                         });
                       } else {
@@ -203,14 +208,26 @@ function BindingDraftModal({ deviceId, deviceName, open, onClose }) {
                   >
                     {s.iotDeviceCode} · {s.name}
                   </Checkbox>
-                  <Tag color={s.kind === '主设备' ? 'blue' : 'default'}>{s.kind}</Tag>
-                  {occupied && <Tag color="warning">已被其它设备占用</Tag>}
+                  {checked && (
+                    <Select
+                      size="small" style={{ width: 96 }} value={item.role}
+                      options={[{ value: 'main', label: '主设备' }, { value: 'sensor', label: '子设备' }]}
+                      onChange={(v) => { actions.setBindingSourceRole(deviceId, s.iotDeviceId, v); setValidateResult(null); }}
+                    />
+                  )}
+                  {occupied && (
+                    <Tooltip title="仅提示：该编码已被其它设备绑定，不影响本次绑定（业务允许多台设备绑定同一来源）">
+                      <Tag color="warning" style={{ cursor: 'help' }}>已被其它设备占用</Tag>
+                    </Tooltip>
+                  )}
                 </div>
               );
             })}
           </div>
           <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginBottom: 0 }}>
-            已选 <b>{draftItems.length}</b> 个来源{draftItems.length > 0 && !hasMain && '，尚未勾选任何「主设备」——校验要求恰好 1 个主设备'}；点击「下一步」为各数据源选择指标。
+            已选 <b>{draftItems.length}</b> 个来源（主设备 {draftItems.filter((i) => i.role === 'main').length} 个 / 子设备 {draftItems.filter((i) => i.role !== 'main').length} 个）
+            {draftItems.length > 0 && !hasMain && '；尚未指定主设备——请在列表中把一个来源设为「主设备」（校验要求恰好 1 个）'}
+            ；点击「下一步」为各数据源选择指标。
           </Typography.Paragraph>
         </>
       )}
@@ -233,7 +250,7 @@ function BindingDraftModal({ deviceId, deviceName, open, onClose }) {
                 title={(
                   <Space wrap>
                     <span>{item.iotDeviceCode} · {item.name || '--'}</span>
-                    <Tag color={item.role === 'main' ? 'blue' : 'default'}>{item.role === 'main' ? '主设备' : '子传感器'}</Tag>
+                    <Tag color={item.role === 'main' ? 'blue' : 'default'}>{item.role === 'main' ? '主设备' : '子设备'}</Tag>
                     <a
                       onClick={() => { actions.removeBindingSource(deviceId, item.iotDeviceId); setValidateResult(null); }}
                       style={{ fontSize: 12 }}
@@ -495,7 +512,7 @@ export default function BindingOverviewPage() {
         />
         <div style={{ color: '#5d6b78', fontSize: 12, marginTop: 8 }}>
           换绑说明：已启用设备可点击「换绑」打开绑定草稿，修改来源/指标后保存将生成新版本 binding-&#123;deviceId&#125;-NN（旧版本留痕不覆盖），新版本状态「待生效」，点「启用」后完成换绑并影响监测/报警/OEE/报表/大屏。
-          校验规则：恰好 1 个启用的主数据源、至少 1 项有效（未失效）指标、IoT 来源编码全局唯一。接入任务健康度见 <a onClick={() => navigate('/platform-metrics')}>平台指标清单 / 接入任务</a>。
+          校验规则：每次绑定恰好 1 个主设备、子设备可多个、至少 1 项有效（未失效）指标、同一绑定内来源编码不重复；来源编码被其它设备占用仅提示、不限制绑定。主/子角色由本系统在绑定时指定（IoT 上报类型仅作参考）。接入任务健康度见 <a onClick={() => navigate('/platform-metrics')}>平台指标清单 / 接入任务</a>。
         </div>
       </Card>
 
