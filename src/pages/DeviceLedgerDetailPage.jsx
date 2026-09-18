@@ -1,7 +1,7 @@
-import React, { useMemo, useState } from 'react';
-import { Card, Descriptions, Tag, Button, Space, App, Alert, Tabs, Table } from 'antd';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Card, Descriptions, Tag, Button, Space, App, Alert, Tabs, Table, Modal, Checkbox } from 'antd';
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import { ArrowLeft, Printer } from 'lucide-react';
+import { ArrowLeft, Printer, Activity } from 'lucide-react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import PageHeader from '../components/PageHeader.jsx';
 import StatusTag from '../components/StatusTag.jsx';
@@ -47,6 +47,13 @@ export default function DeviceLedgerDetailPage() {
 
   const [trendKey, setTrendKey] = useState(null);
   const [activeTab, setActiveTab] = useState(searchParams.get('tab') || null);
+  // 自定义监控曲线：本页 UI 偏好（不入 store / 不入绑定），换设备时清空
+  const [monitorCurves, setMonitorCurves] = useState([]);   // 已选数值指标 metricCode 列表
+  const [curveModalOpen, setCurveModalOpen] = useState(false);
+  const [curveDraft, setCurveDraft] = useState([]);         // 弹窗内的临时勾选
+
+  useEffect(() => { setMonitorCurves([]); setCurveDraft([]); setCurveModalOpen(false); }, [deviceId]);
+  useEffect(() => { if (curveModalOpen) setCurveDraft(monitorCurves); }, [curveModalOpen]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!d360) {
     const shown = deviceIdParam || searchParams.get('deviceId') || searchParams.get('code') || '未提供设备编号';
@@ -127,6 +134,23 @@ export default function DeviceLedgerDetailPage() {
   const sourceItems = (binding?.items || []).filter(i => i.enabled);
   const totalSelected = (binding?.items || [])
     .reduce((s, i) => s + (i.enabled ? (i.metrics || []).filter(m => m.selected).length : 0), 0);
+
+  // ===== 自定义监控曲线：候选 = 该设备绑定（启用）来源中类型为「数值」的已选指标（状态/事件类 S.* 不参与） =====
+  const numericMetricOptions = (realtime.metrics || [])
+    .filter(r => state.entities.metricsByKey[r.metricCode]?.dataType === '数值');
+
+  // 曲线序列：优先用平台快照趋势（trends）；无快照时按当前采样值生成确定性演示序列（含小幅波动与漂移）
+  const curveSeries = (metricCode, value) => {
+    if (value === null || value === undefined) return null;
+    const seedKey = `${device.deviceId}|${metricCode}`;
+    if (state.entities.trends?.[seedKey]) return state.entities.trends[seedKey];
+    const seed = [...(`${device.deviceId}${metricCode}`)].reduce((s, c) => s + c.charCodeAt(0), 0);
+    return Array.from({ length: 12 }, (_, i) => {
+      const wave = Math.sin((seed % 17) + i * 0.9) * 0.035;
+      const drift = (i / 11 - 0.5) * 0.06;
+      return +(value * (1 + wave + drift)).toFixed(3);
+    });
+  };
 
   const metricColumns = [
     { title: '指标编码', dataIndex: 'metricCode', width: 160 },
@@ -420,6 +444,60 @@ export default function DeviceLedgerDetailPage() {
     tabItems.push({
       key: 'trend', label: '状态与趋势', children: (
         <>
+          {(numericMetricOptions.length > 0 || monitorCurves.length > 0) && (
+            <Card
+              size="small" style={{ marginBottom: 12 }}
+              title={`监控曲线（${monitorCurves.length ? `已配置 ${monitorCurves.length} 项` : '未配置'}）`}
+              extra={(
+                <Button size="small" icon={<Activity size={13} />} onClick={() => setCurveModalOpen(true)}>
+                  配置监控曲线
+                </Button>
+              )}
+            >
+              {monitorCurves.length === 0 ? (
+                <span style={{ color: '#8a97a3', fontSize: 12 }}>
+                  尚未配置：点击「配置监控曲线」，勾选该设备已绑定来源中类型为「数值」的指标，选择后在此形成曲线趋势图进行监控。
+                </span>
+              ) : (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 12 }}>
+                  {monitorCurves.map((code) => {
+                    const row = numericMetricOptions.find(r => r.metricCode === code);
+                    const values = curveSeries(code, row?.value ?? null);
+                    return (
+                      <div key={code}>
+                        <div style={{ fontSize: 12, marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                          <b>{row?.name || code}</b>
+                          <span style={{ color: '#8a97a3' }}>{code} · 来源 {row?.iotDeviceCode || '--'}</span>
+                          <Tag color="processing">{row?.value ?? '--'} {row?.unit || ''}</Tag>
+                          <Tag color={QUALITY_COLOR[row?.qualityCode] || 'default'}>{QUALITY_LABEL[row?.qualityCode] || row?.qualityCode || '--'}</Tag>
+                        </div>
+                        {values ? (
+                          <ResponsiveContainer width="100%" height={160}>
+                            <LineChart data={values.map((v, i) => ({ i: `t${i + 1}`, v }))}>
+                              <CartesianGrid strokeDasharray="3 3" stroke="#e5e8ea" />
+                              <XAxis dataKey="i" tick={{ fontSize: 10 }} />
+                              <YAxis tick={{ fontSize: 10 }} domain={['auto', 'auto']} />
+                              <Tooltip />
+                              <Line type="linear" dataKey="v" stroke="#00b8d4" dot={false} />
+                            </LineChart>
+                          </ResponsiveContainer>
+                        ) : (
+                          <div style={{ color: '#8a97a3', fontSize: 12, padding: '48px 0', textAlign: 'center', border: '1px dashed #eef1f4', borderRadius: 6 }}>
+                            当前无数据（数据中断或指标无值），无法成图
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+              {monitorCurves.length > 0 && (
+                <div style={hint}>
+                  序列说明：优先使用平台快照趋势，无快照时按当前采样值生成确定性演示序列；监控曲线为页面级配置（不写入绑定），换设备后需重新配置。
+                </div>
+              )}
+            </Card>
+          )}
           {trendEntries.length === 0 ? (
             <Card size="small">
               <EmptyState
@@ -547,6 +625,50 @@ export default function DeviceLedgerDetailPage() {
         items={tabItems}
         tabBarGutter={16}
       />
+
+      {/* 配置监控曲线：勾选该设备绑定来源中类型为「数值」的指标，确定后形成曲线趋势图 */}
+      <Modal
+        title={`配置监控曲线 · ${device.name}（${device.deviceId}）`}
+        width={640}
+        open={curveModalOpen}
+        onCancel={() => setCurveModalOpen(false)}
+        onOk={() => {
+          setMonitorCurves(curveDraft);
+          setCurveModalOpen(false);
+        }}
+        okText={`确定（已选 ${curveDraft.length} 项）`}
+        cancelText="取消"
+      >
+        <Alert
+          type="info" showIcon style={{ marginBottom: 12 }}
+          message="仅列出该设备绑定（启用）来源中类型为「数值」的指标；状态 / 事件类指标（S.*）不参与曲线监控。可多选，确定后在「状态与趋势」栏目形成各指标的曲线趋势图。"
+        />
+        {numericMetricOptions.length === 0 ? (
+          <div style={{ color: '#8a97a3', fontSize: 12, padding: '8px 0' }}>
+            该设备绑定的来源中没有类型为「数值」的已选指标：请先在「联网配置」中为来源勾选数值型指标。
+          </div>
+        ) : (
+          <div style={{ border: '1px solid #eef1f4', borderRadius: 6, padding: '8px 12px', maxHeight: 320, overflow: 'auto' }}>
+            {numericMetricOptions.map((r) => (
+              <div key={r.metricCode} style={{ padding: '4px 0' }}>
+                <Checkbox
+                  checked={curveDraft.includes(r.metricCode)}
+                  onChange={(e) => {
+                    setCurveDraft(e.target.checked
+                      ? [...curveDraft, r.metricCode]
+                      : curveDraft.filter((c) => c !== r.metricCode));
+                  }}
+                >
+                  <span>{r.name}（{r.metricCode}）</span>
+                  <span style={{ color: '#8a97a3', marginLeft: 6 }}>来源 {r.iotDeviceCode || '--'}</span>
+                  <Tag style={{ marginLeft: 6 }}>{r.value ?? '--'} {r.unit || ''}</Tag>
+                  <Tag color={QUALITY_COLOR[r.qualityCode] || 'default'}>{QUALITY_LABEL[r.qualityCode] || r.qualityCode}</Tag>
+                </Checkbox>
+              </div>
+            ))}
+          </div>
+        )}
+      </Modal>
     </>
   );
 }
