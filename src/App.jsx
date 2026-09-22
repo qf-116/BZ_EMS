@@ -84,7 +84,6 @@ import SparePartReportPage from './pages/SparePartReportPage.jsx';
 import MttrMtbfReportPage from './pages/MttrMtbfReportPage.jsx';
 import ComprehensiveReportPage from './pages/ComprehensiveReportPage.jsx';
 import LifecycleTasksPage from './pages/LifecycleTasksPage.jsx';
-import LifecycleWorkbenchPage from './pages/LifecycleWorkbenchPage.jsx';
 import LifecycleGovernancePage from './pages/LifecycleGovernancePage.jsx';
 // 基础配置模块：系统从宿主平台拆分独立后自建（用户/角色/组织/字典/日志）
 import SystemUsersPage from './pages/SystemUsersPage.jsx';
@@ -120,7 +119,7 @@ const menus = [
     // V2.1：设备联网配置移入「数据接入 · 联网配置总览」，设备台账列表提供「联网配置」入口
   ] },
   { key: 'lifecycle', icon: <ClipboardCheck size={15} />, label: '生命周期管理', children: [
-    { key: '/lifecycle/workbench', icon: <LayoutDashboard size={14} />, label: '生命周期工作台' },
+    // 生命周期工作台（/lifecycle/workbench）暂不下发：按需求移除，旧路由重定向到设备入账；页面文件保留备用
     { key: '/lifecycle/tasks', icon: <ClipboardCheck size={14} />, label: '设备入账' },
     { key: '/lifecycle/changes', icon: <ArrowRightLeft size={14} />, label: '资产变更' },
     { key: '/lifecycle/idle', icon: <CirclePause size={14} />, label: '闲置与再启用' },
@@ -313,8 +312,8 @@ export default function App() {
                   <Route path="/device-ledger/net-config" element={<NetConfigRedirect />} />
                   <Route path="/doc-library" element={<DocLibraryPage />} />
                   <Route path="/base-type-config" element={<BaseTypeConfigPage />} />
-                  {/* 生命周期管理：简化流程与资产治理 */}
-                  <Route path="/lifecycle/workbench" element={<LifecycleWorkbenchPage />} />
+                  {/* 生命周期管理：简化流程与资产治理（生命周期工作台已下线，重定向到设备入账） */}
+                  <Route path="/lifecycle/workbench" element={<Navigate to="/lifecycle/tasks" replace />} />
                   <Route path="/lifecycle/tasks" element={<LifecycleTasksPage />} />
                   <Route path="/lifecycle/tasks/procurement-entry" element={<LifecycleTasksPage mode="procurement" />} />
                   <Route path="/lifecycle/tasks/trial-confirmation" element={<LifecycleTasksPage mode="trial" />} />

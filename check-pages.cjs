@@ -6,7 +6,8 @@ const routes = [
   '/', '/device-ledger', '/device-ledger/detail/DEV-004', '/device-ledger/detail?code=MT2024A1204', '/device-ledger/net-config?code=MT2024A1201',
   '/doc-library', '/base-type-config',
   // 设备生命周期：简化主流程与资产治理
-  '/lifecycle/workbench', '/lifecycle/tasks', '/lifecycle/tasks/procurement-entry',
+  // 生命周期工作台已下线（重定向设备入账），不再列入烟测
+  '/lifecycle/tasks', '/lifecycle/tasks/procurement-entry',
   '/lifecycle/tasks/trial-confirmation', '/lifecycle/tasks/device-registration',
   '/lifecycle/changes', '/lifecycle/idle', '/lifecycle/scrap',
   // 点检 / 保养 / 巡检（演示模块）

@@ -83,32 +83,8 @@ const reportRedirectSpec = {
 };
 
 const specs = {
-  '/lifecycle/workbench': {
-    title: '生命周期工作台',
-    content: (
-      <>
-        <h4>页面目标</h4>
-        <p>集中展示设备全生命周期待办、退回结果和资产治理事项，帮助用户判断下一步是补充采购入账、完成试用确认、办理设备入账，还是处理变更、闲置或报废单据。</p>
-        <h4>数据来源</h4>
-        <ul>
-          <li>主流程数据来自 <code>selectWorkbench(state).lifecycle</code>，包含待采购入账、待试用确认、待设备手续入账、试用不合格退回和已入账任务。</li>
-          <li>资产治理数据来自 <code>assetChangeRecordsById / idleApplicationsById / scrapApplicationsById</code> 的 selector 读模型。</li>
-          <li>页面只消费状态层，不在本页直接修改任务状态。</li>
-        </ul>
-        <h4>指标与列表</h4>
-        <Fields items={[
-          ['待采购入账', '状态 ∈ {采购入账待提交, 采购入账待修改, 试用不合格退回} 的任务数'],
-          ['待试用确认', '状态 = 使用部门试用确认中 的任务数'],
-          ['待设备手续入账', '状态 = 待设备手续入账 的任务数'],
-          ['设备入账待办', '三个主流程待办合并展示，处理按钮按当前状态跳转对应任务路由'],
-          ['资产治理待办', '变更的待审批/审批通过、闲置的复核中/待审批、报废的技术鉴定中/待财务核销/已报废'],
-          ['主流程结果', '展示试用不合格退回和设备已入账，用于追溯退回原因和入账结果'],
-        ]} />
-        <h4>边界</h4>
-        <p>本页不建设到货、安装、调试和独立验收指标；也不替换全局工作台的报警、维修、备件和接入异常待办。</p>
-      </>
-    ),
-  },
+  // 生命周期工作台（/lifecycle/workbench）已按需求下线（2026-09-22），旧路由重定向到 /lifecycle/tasks；
+  // 页面文件 LifecycleWorkbenchPage.jsx 保留备用，恢复时连同菜单/路由与本条细则一并还原。
   '/lifecycle/tasks': {
     title: '设备入账流程',
     content: (
@@ -1782,7 +1758,6 @@ function demoModuleSpec(path) {
 export function specForPath(path) {
   if (!path) return specs['/'];
   if (path.startsWith('/lifecycle/tasks')) return specs['/lifecycle/tasks'];
-  if (path.startsWith('/lifecycle/workbench')) return specs['/lifecycle/workbench'];
   if (path.startsWith('/lifecycle/changes')) return specs['/lifecycle/changes'];
   if (path.startsWith('/lifecycle/idle')) return specs['/lifecycle/idle'];
   if (path.startsWith('/lifecycle/scrap')) return specs['/lifecycle/scrap'];
