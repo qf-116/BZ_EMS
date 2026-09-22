@@ -23,6 +23,12 @@ const COLOR_MAP = {
   待执行: 'processing', 进行中: 'processing', 已逾期: 'error',
   // 生命周期
   在用: 'success', 闲置: 'warning', 停用: 'default', '报废/归档': 'default',
+  采购入账待提交: 'processing', 采购入账待修改: 'warning', 使用部门试用确认中: 'processing',
+  试用不合格退回: 'error', 待设备手续入账: 'warning', 设备已入账: 'success',
+  复核中: 'processing', 继续闲置: 'warning', 已再启用: 'success', 转报废: 'error',
+  技术鉴定中: 'processing', 待财务核销: 'warning', 已报废: 'error', 已归档: 'default',
+  待审批: 'warning', 审批通过: 'processing', 鉴定未通过: 'default',
+  合格: 'success', 不合格: 'error', 再启用: 'success',
   // 库存
   低于安全库存: 'error', 超过最大库存: 'warning',
   // 接入任务

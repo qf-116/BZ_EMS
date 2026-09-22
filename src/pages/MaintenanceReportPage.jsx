@@ -165,7 +165,6 @@ export default function MaintenanceReportPage() {
       <PageHeader
         title="保养执行统计"
         subtitle={`按设备 / 执行人聚合保养任务（共 ${maintenanceTasks.length} 条）：计划完成率 = 已完成 /（总数 − 已关闭）`}
-        actions={<Button icon={<Download size={14} />} onClick={() => setExportOpen(true)}>导出</Button>}
       />
       <DegradedBanner meta={meta} />
 
@@ -191,6 +190,9 @@ export default function MaintenanceReportPage() {
       </Card>
 
       <Card size="small">
+        <Space wrap style={{ marginBottom: 12 }}>
+          <Button icon={<Download size={14} />} onClick={() => setExportOpen(true)}>导出</Button>
+        </Space>
         <Tabs
           defaultActiveKey="device"
           size="small"

@@ -4,8 +4,9 @@ import { Layout, Menu, Badge, Button, Dropdown, Space } from 'antd';
 import {
   Activity, AlarmClock, BookOpen, ClipboardList, DatabaseZap, FileBarChart,
   Gauge, LineChart, Settings2, Truck, Bell, CalendarClock,
-  LayoutDashboard, Boxes, Wrench, Package,
+  LayoutDashboard, Boxes, Wrench, Package, ClipboardCheck, ArrowRightLeft, CirclePause, Archive,
   GaugeCircle, LogOut, Layers, LayoutTemplate,
+  Users, ShieldCheck, Building2, BookMarked, ScrollText,
 } from 'lucide-react';
 import LoginPage from './pages/LoginPage.jsx';
 import WorkbenchPage from './pages/WorkbenchPage.jsx';
@@ -55,8 +56,7 @@ import PatrolTasksPage from './pages/PatrolTasksPage.jsx';
 import PatrolTaskDetailPage from './pages/PatrolTaskDetailPage.jsx';
 import PatrolExecutePage from './pages/PatrolExecutePage.jsx';
 import PatrolReportPage from './pages/PatrolReportPage.jsx';
-// 范围外页面：系统管理（权限/审计）由宿主平台提供，统一渲染 ScopeNoticePage
-import ScopeNoticePage from './components/ScopeNoticePage.jsx';
+// 范围外提示组件 ScopeNoticePage 保留在 components/ 下备用（原 /permissions、/audit 已由基础配置模块承接）
 import { DemoStoreProvider } from './state/DemoStore.jsx';
 import RepairPendingPage from './pages/RepairPendingPage.jsx';
 import RepairReportsPage from './pages/RepairReportsPage.jsx';
@@ -83,6 +83,15 @@ import RepairReportPage from './pages/RepairReportPage.jsx';
 import SparePartReportPage from './pages/SparePartReportPage.jsx';
 import MttrMtbfReportPage from './pages/MttrMtbfReportPage.jsx';
 import ComprehensiveReportPage from './pages/ComprehensiveReportPage.jsx';
+import LifecycleTasksPage from './pages/LifecycleTasksPage.jsx';
+import LifecycleWorkbenchPage from './pages/LifecycleWorkbenchPage.jsx';
+import LifecycleGovernancePage from './pages/LifecycleGovernancePage.jsx';
+// 基础配置模块：系统从宿主平台拆分独立后自建（用户/角色/组织/字典/日志）
+import SystemUsersPage from './pages/SystemUsersPage.jsx';
+import SystemRolesPage from './pages/SystemRolesPage.jsx';
+import SystemOrgPage from './pages/SystemOrgPage.jsx';
+import SystemDictPage from './pages/SystemDictPage.jsx';
+import SystemLogsPage from './pages/SystemLogsPage.jsx';
 
 const { Sider, Content, Header } = Layout;
 
@@ -98,8 +107,8 @@ function NetConfigRedirect() {
   return <Navigate to={`/device-ledger/detail${qs ? `?${qs}&tab=network` : '?tab=network'}`} replace />;
 }
 
-// 菜单架构：白名单业务域 + 点检/保养/巡检演示模块（应需求恢复，作为范围外演示模块由点巡保养业务承接完整闭环）；
-// 系统管理（权限/审计）仍由宿主平台公共服务提供（§0.3/§0.4）。
+// 菜单架构：白名单业务域 + 点检/保养/巡检演示模块（应需求恢复，作为范围外演示模块由点巡保养业务承接完整闭环）
+// + 基础配置模块（系统从宿主平台拆分独立后自建：用户/角色/组织机构/字典/日志）。
 const menus = [
   { key: 'workbench', icon: <LayoutDashboard size={15} />, label: '工作台', children: [
     { key: '/', icon: <LayoutDashboard size={14} />, label: '工作台首页' },
@@ -108,8 +117,14 @@ const menus = [
     { key: '/device-ledger', icon: <Boxes size={14} />, label: '设备台账' },
     { key: '/doc-library', icon: <BookOpen size={14} />, label: '综合文档库' },
     { key: '/base-type-config', icon: <Settings2 size={14} />, label: '基础类型配置' },
-    // 预留：采购申请 / 到货验收 / 安装调试 / 设备变更 / 报废处置（另行确认后交付）
     // V2.1：设备联网配置移入「数据接入 · 联网配置总览」，设备台账列表提供「联网配置」入口
+  ] },
+  { key: 'lifecycle', icon: <ClipboardCheck size={15} />, label: '生命周期管理', children: [
+    { key: '/lifecycle/workbench', icon: <LayoutDashboard size={14} />, label: '生命周期工作台' },
+    { key: '/lifecycle/tasks', icon: <ClipboardCheck size={14} />, label: '设备入账' },
+    { key: '/lifecycle/changes', icon: <ArrowRightLeft size={14} />, label: '资产变更' },
+    { key: '/lifecycle/idle', icon: <CirclePause size={14} />, label: '闲置与再启用' },
+    { key: '/lifecycle/scrap', icon: <Archive size={14} />, label: '报废与归档' },
   ] },
   { key: 'inspection', icon: <ClipboardList size={15} />, label: '点检管理', children: [
     { key: '/inspection-items', icon: <ClipboardList size={14} />, label: '点检项目' },
@@ -180,7 +195,14 @@ const menus = [
     { key: '/report/patrol', icon: <FileBarChart size={14} />, label: '巡检执行统计' },
     { key: '/report/maintenance', icon: <FileBarChart size={14} />, label: '保养执行统计' },
   ] },
-  // 系统管理（权限/审计）由宿主平台公共服务提供，本系统不重复建设（§0.3/§0.4）
+  // 基础配置：系统从宿主平台拆分独立后自建的基础管理域（承接原平台级 用户/角色/组织/字典/日志）
+  { key: 'system', icon: <Users size={15} />, label: '基础配置', children: [
+    { key: '/system/users', icon: <Users size={14} />, label: '用户管理' },
+    { key: '/system/roles', icon: <ShieldCheck size={14} />, label: '角色管理' },
+    { key: '/system/org', icon: <Building2 size={14} />, label: '组织机构' },
+    { key: '/system/dict', icon: <BookMarked size={14} />, label: '字典管理' },
+    { key: '/system/logs', icon: <ScrollText size={14} />, label: '日志管理' },
+  ] },
 ];
 
 export default function App() {
@@ -291,6 +313,15 @@ export default function App() {
                   <Route path="/device-ledger/net-config" element={<NetConfigRedirect />} />
                   <Route path="/doc-library" element={<DocLibraryPage />} />
                   <Route path="/base-type-config" element={<BaseTypeConfigPage />} />
+                  {/* 生命周期管理：简化流程与资产治理 */}
+                  <Route path="/lifecycle/workbench" element={<LifecycleWorkbenchPage />} />
+                  <Route path="/lifecycle/tasks" element={<LifecycleTasksPage />} />
+                  <Route path="/lifecycle/tasks/procurement-entry" element={<LifecycleTasksPage mode="procurement" />} />
+                  <Route path="/lifecycle/tasks/trial-confirmation" element={<LifecycleTasksPage mode="trial" />} />
+                  <Route path="/lifecycle/tasks/device-registration" element={<LifecycleTasksPage mode="registration" />} />
+                  <Route path="/lifecycle/changes" element={<LifecycleGovernancePage kind="change" />} />
+                  <Route path="/lifecycle/idle" element={<LifecycleGovernancePage kind="idle" />} />
+                  <Route path="/lifecycle/scrap" element={<LifecycleGovernancePage kind="scrap" />} />
                   {/* 运行监测 */}
                   <Route path="/monitor-overview" element={<OverviewPage />} />
                   <Route path="/realtime" element={<RealtimePage />} />
@@ -380,9 +411,15 @@ export default function App() {
                   <Route path="/report/maintenance" element={<MaintenanceReportPage />} />
                   <Route path="/report/repair" element={<RepairReportPage />} />
                   <Route path="/report/sparepart" element={<SparePartReportPage />} />
-                  {/* 系统管理：由宿主平台公共服务提供（§0.4），本系统不重复建设 */}
-                  <Route path="/permissions" element={<ScopeNoticePage title="权限管理由宿主平台提供" reason="平台统一身份认证、组织/角色/权限管理由平台基础管理模块统一提供，本系统只消费宿主上下文。" host="平台基础管理模块" />} />
-                  <Route path="/audit" element={<ScopeNoticePage title="操作审计由宿主平台提供" reason="平台级审计/日志服务由宿主平台提供，本系统仅保留设备、绑定、报警、维修、库存、停机、OEE、接入任务等业务履历。" host="平台基础管理模块" />} />
+                  {/* 基础配置模块：系统拆分独立后自建的基础管理域 */}
+                  <Route path="/system/users" element={<SystemUsersPage />} />
+                  <Route path="/system/roles" element={<SystemRolesPage />} />
+                  <Route path="/system/org" element={<SystemOrgPage />} />
+                  <Route path="/system/dict" element={<SystemDictPage />} />
+                  <Route path="/system/logs" element={<SystemLogsPage />} />
+                  {/* 原「由宿主平台提供」的权限/审计入口，拆分后由本系统基础配置模块承接，重定向 */}
+                  <Route path="/permissions" element={<Navigate to="/system/roles" replace />} />
+                  <Route path="/audit" element={<Navigate to="/system/logs" replace />} />
                   {/* 旧路径兼容 */}
                   <Route path="/metrics" element={<Navigate to="/report/runtime" replace />} />
                   <Route path="/reports/*" element={<Navigate to="/report/runtime" replace />} />

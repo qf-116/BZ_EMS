@@ -75,9 +75,11 @@ export default function AlarmRuleVersionPage() {
       <PageHeader
         title="报警规则版本"
         subtitle="版本快照只读 · 不可修改 · 活动报警使用触发时版本快照 · 比对为只读展示"
-        actions={<Button icon={<Download size={14} />} onClick={() => message.success('规则版本快照导出任务已创建')}>导出</Button>}
       />
       <Card size="small">
+        <Space wrap style={{ marginBottom: 12 }}>
+          <Button icon={<Download size={14} />} onClick={() => message.success('规则版本快照导出任务已创建')}>导出</Button>
+        </Space>
         <Table
           rowKey={r => `${r.code}|${r.version}`}
           size="small"

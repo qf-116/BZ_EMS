@@ -179,7 +179,7 @@ export default function RuleConfigPage() {
 
   return (
     <>
-      <PageHeader title="报警规则配置" subtitle="规则类型联动触发配置：阈值（判定模式+指标特征模板）/ 状态（枚举判定）/ 质量（数据质量码）/ 组合（多条件 AND·OR）· 防抖触发 · 恢复迟滞回差 · 重复抑制 · 风暴限流 · 当前启用 9 条" actions={<Button type="primary" icon={<Plus size={14} />} onClick={openCreate}>新增规则</Button>} />
+      <PageHeader title="报警规则配置" subtitle="规则类型联动触发配置：阈值（判定模式+指标特征模板）/ 状态（枚举判定）/ 质量（数据质量码）/ 组合（多条件 AND·OR）· 防抖触发 · 恢复迟滞回差 · 重复抑制 · 风暴限流 · 当前启用 9 条" />
 
       {/* 报警治理提示：高抖动规则建议调整回差 / 持续时间 */}
       {chattering.length > 0 && (
@@ -191,6 +191,9 @@ export default function RuleConfigPage() {
       )}
 
       <Card size="small">
+        <Space wrap style={{ marginBottom: 12 }}>
+          <Button type="primary" icon={<Plus size={14} />} onClick={openCreate}>新增规则</Button>
+        </Space>
         <Table
           rowKey="code"
           size="small"

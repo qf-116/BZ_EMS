@@ -8,6 +8,7 @@ import StatusTag from '../components/StatusTag.jsx';
 import EmptyState from '../components/EmptyState.jsx';
 import DegradedBanner from '../components/DegradedBanner.jsx';
 import MetricTile from '../components/MetricTile.jsx';
+import MetricHistoryPanel from '../components/MetricHistoryPanel.jsx';
 import { useDemoState } from '../state/DemoStore.jsx';
 import { selectDevice360 } from '../state/selectors.js';
 // 点检/保养/巡检为演示种子（完整闭环由点巡保养业务模块承接）；维修/报警来自演示状态机
@@ -22,7 +23,7 @@ const emptyText = (label) => <span style={{ color: '#8a97a3' }}>该设备暂无{
 
 // 设备详情（统一页面）：/device-ledger/detail/:deviceId；兼容旧 query（deviceId / monitorCode / code=资产编码）。
 // /device/:deviceId 与 /device-ledger/net-config 重定向到本页。
-// 栏目：基础信息 / 点检 / 巡检 / 保养 / 维修 / 联网配置（全设备）；联网设备另有 实时监测 / 状态与趋势 / 报警事件 / 生产记录。
+// 栏目：基础信息 / 生命周期履历 / 点检 / 巡检 / 保养 / 维修 / 联网配置（全设备）；联网设备另有 实时监测 / 指标历史数据 / 状态与趋势 / 报警事件 / 生产记录。
 export default function DeviceLedgerDetailPage() {
   const { deviceId: deviceIdParam } = useParams();
   const [searchParams] = useSearchParams();
@@ -77,9 +78,12 @@ export default function DeviceLedgerDetailPage() {
     );
   }
 
-  const { device, binding, realtime, health, activeAlarms, repair, oee } = d360;
+  const { device, binding, realtime, health, activeAlarms, repair, oee, lifecycleHistory } = d360;
   const hasBinding = !!binding;
   const lifecycleOnly = device.lifecycleStatus !== '在用';
+  // 入账来源：按 deviceId 反查生成本设备的生命周期流程任务（任务侧持有 registration.deviceIds）
+  const lifecycleTaskForDevice = Object.values(state.entities.lifecycleTasksById || {})
+    .find(t => (t.registration?.deviceIds || []).includes(device.deviceId)) || null;
 
   // ===== 关联业务记录 =====
   // 点检/巡检/保养：演示种子按资产编码（assetCode）过滤，任务明细为最近一次任务的设备行，按最新任务补齐计划口径；
@@ -187,6 +191,18 @@ export default function DeviceLedgerDetailPage() {
               <StatusTag value={binding?.configStatus || '未配置'} tip={binding ? `绑定 v${binding.version}` : '未创建绑定'} />
             </Descriptions.Item>
             <Descriptions.Item label="生命周期"><StatusTag value={device.lifecycleStatus} /></Descriptions.Item>
+            <Descriptions.Item label="入账来源">
+              {lifecycleTaskForDevice ? (
+                <Space size={6}>
+                  <a onClick={() => navigate('/lifecycle/tasks')}>{lifecycleTaskForDevice.taskNo}</a>
+                  <Tag color={lifecycleTaskForDevice.sourceType === 'MANUAL' ? 'default' : 'processing'}>
+                    {lifecycleTaskForDevice.sourceType === 'MANUAL' ? '手工新增' : '采购系统同步'}
+                  </Tag>
+                </Space>
+              ) : (
+                <span style={{ color: '#8a97a3' }}>手工建档 / 未走流程</span>
+              )}
+            </Descriptions.Item>
             <Descriptions.Item label="组织">{device.organizationId || '--'}</Descriptions.Item>
             <Descriptions.Item label="车间">{device.workshopName || '--'}</Descriptions.Item>
             <Descriptions.Item label="产线 / 工位">{[device.lineName, device.stationName].filter(Boolean).join(' / ') || '--'}</Descriptions.Item>
@@ -227,6 +243,27 @@ export default function DeviceLedgerDetailPage() {
           </div>
         </Card>
       </>
+    ),
+  });
+
+  tabItems.push({
+    key: 'lifecycle-history', label: '生命周期履历', children: (
+      <Card size="small" title="生命周期履历">
+        <Table
+          rowKey="key" size="small" pagination={{ pageSize: 8, showTotal: t => `共 ${t} 条` }}
+          dataSource={lifecycleHistory}
+          locale={{ emptyText: <EmptyState description="该设备暂无生命周期履历" reason="设备手续入账、资产变更、闲置或报废动作会写入履历" /> }}
+          columns={[
+            { title: '时间', dataIndex: 'time', width: 160, render: dash },
+            { title: '类型', dataIndex: 'type', width: 110 },
+            { title: '单据/事件', dataIndex: 'title', width: 170, ellipsis: true },
+            { title: '说明', dataIndex: 'detail', ellipsis: true },
+            { title: '处理人', dataIndex: 'actor', width: 100, render: dash },
+            { title: '状态', dataIndex: 'status', width: 100, render: v => <StatusTag value={v} /> },
+          ]}
+        />
+        <div style={hint}>履历由生命周期单据和动作事实聚合生成，只读展示，不在本页直接修改历史记录。</div>
+      </Card>
     ),
   });
 
@@ -439,6 +476,11 @@ export default function DeviceLedgerDetailPage() {
             )}
           </Card>
         </>
+      ),
+    });
+    tabItems.push({
+      key: 'metric-history', label: '指标历史数据', children: (
+        <MetricHistoryPanel device={device} realtime={realtime} metricsByKey={state.entities.metricsByKey} />
       ),
     });
     tabItems.push({

@@ -92,9 +92,11 @@ export default function RuleTemplatePage() {
       <PageHeader
         title="报警规则模板"
         subtitle="同型设备指标特征一致 · 模板 = 除设备绑定外的全部规则要素 · 应用 = 选模板 + 选设备 + 选指标 · 模板更新不回写已发布规则"
-        actions={<Button type="primary" icon={<Plus size={14} />} onClick={() => openModal(null)}>新增模板</Button>}
       />
       <Card size="small">
+        <Space wrap style={{ marginBottom: 12 }}>
+          <Button type="primary" icon={<Plus size={14} />} onClick={() => openModal(null)}>新增模板</Button>
+        </Space>
         <Table
           rowKey="code" size="small" scroll={{ x: 2100 }}
           dataSource={rows}

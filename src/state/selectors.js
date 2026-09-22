@@ -372,7 +372,19 @@ export function selectWorkbench(state) {
   const degradedDevices = Object.keys(state.entities.healthByDeviceId)
     .filter(id => ['延迟', '数据中断', '部分中断'].includes(state.entities.healthByDeviceId[id].status))
     .map(id => ({ deviceId: id, ...state.entities.healthByDeviceId[id] }));
-  return { unacked, processing, pendingDispatch, pendingAccept, lowStock, ingestionIssues, degradedDevices };
+  const lifecycleTasks = Object.values(state.entities.lifecycleTasksById || {});
+  const lifecycle = {
+    all: lifecycleTasks.sort((a, b) => (a.taskNo < b.taskNo ? 1 : -1)),
+    pendingProcurement: lifecycleTasks.filter(t => ['采购入账待提交', '采购入账待修改', '试用不合格退回'].includes(t.status)),
+    pendingTrial: lifecycleTasks.filter(t => t.status === '使用部门试用确认中'),
+    pendingRegistration: lifecycleTasks.filter(t => t.status === '待设备手续入账'),
+    completed: lifecycleTasks.filter(t => t.status === '设备已入账'),
+    rejected: lifecycleTasks.filter(t => t.status === '试用不合格退回'),
+    changes: Object.values(state.entities.assetChangeRecordsById || {}),
+    idle: Object.values(state.entities.idleApplicationsById || {}),
+    scraps: Object.values(state.entities.scrapApplicationsById || {}),
+  };
+  return { unacked, processing, pendingDispatch, pendingAccept, lowStock, ingestionIssues, degradedDevices, lifecycle };
 }
 
 // ---------- 设备 360 / 履历 ----------
@@ -390,7 +402,64 @@ export function selectDevice360(state, deviceId) {
     oee: selectOeeResult(state, deviceId, { window: 'realtime' }),
     ingestionTasks: selectIngestionTasks(state, deviceId),
     history: selectBusinessHistory(state, 'device', deviceId),
+    lifecycleHistory: selectDeviceLifecycleHistory(state, deviceId),
   };
+}
+
+export function selectLifecycleTasks(state, filter = {}) {
+  return Object.values(state.entities.lifecycleTasksById || {})
+    .filter(t => !filter.status || t.status === filter.status)
+    .filter(t => !filter.keyword || [t.taskNo, t.equipmentName, t.model, t.brand, t.useDept].some(v => String(v || '').includes(filter.keyword)))
+    .sort((a, b) => (a.taskNo < b.taskNo ? 1 : -1));
+}
+
+export function selectLifecycleTask(state, taskId) {
+  return state.entities.lifecycleTasksById?.[taskId] || null;
+}
+
+export function selectAssetChanges(state) {
+  return Object.values(state.entities.assetChangeRecordsById || {}).sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+}
+
+export function selectIdleApplications(state) {
+  return Object.values(state.entities.idleApplicationsById || {}).sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+}
+
+export function selectScrapApplications(state) {
+  return Object.values(state.entities.scrapApplicationsById || {}).sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+}
+
+export function selectDeviceLifecycleHistory(state, deviceId) {
+  if (!deviceId) return [];
+  const rows = [];
+
+  Object.values(state.entities.lifecycleTasksById || {}).forEach(task => {
+    const registered = (task.registration?.deviceIds || []).includes(deviceId);
+    if (!registered) return;
+    rows.push({ key: `${task.taskId}-register`, time: task.registration?.submittedAt, type: '设备手续入账', title: task.taskNo, detail: `生成设备台账：${task.equipmentName || '--'}`, actor: task.registration?.registrar, status: '已完成' });
+    rows.push({ key: `${task.taskId}-trial`, time: task.trial?.confirmedAt, type: '试用确认', title: task.taskNo, detail: task.trial?.opinion || '--', actor: task.trial?.confirmer, status: task.trial?.result });
+    rows.push({ key: `${task.taskId}-procurement`, time: task.procurement?.submittedAt, type: '采购入账', title: task.taskNo, detail: `${task.equipmentName || '--'} / ${task.model || '--'}；合同 ${task.contractNo || '--'}`, actor: task.procurement?.submittedBy, status: task.procurement?.submittedAt ? '已提交' : '待提交' });
+  });
+
+  Object.values(state.entities.assetChangeRecordsById || {})
+    .filter(r => r.deviceId === deviceId)
+    .forEach(r => rows.push({ key: r.changeId, time: r.completedAt || r.approvedAt || r.createdAt, type: '资产变更', title: `${r.changeNo} · ${r.type}`, detail: r.reason || '--', actor: r.executor || r.approver || r.applicant, status: r.status }));
+
+  Object.values(state.entities.idleApplicationsById || {})
+    .filter(r => r.deviceId === deviceId)
+    .forEach(r => rows.push({ key: r.idleId, time: r.reviewedAt || r.createdAt, type: '闲置管理', title: r.idleNo, detail: `${r.reason || '--'}${r.reviewOpinion ? `；复核：${r.reviewOpinion}` : ''}`, actor: r.reviewer || r.applicant, status: r.status }));
+
+  Object.values(state.entities.scrapApplicationsById || {})
+    .filter(r => r.deviceId === deviceId)
+    .forEach(r => rows.push({ key: r.scrapId, time: r.archivedAt || r.writeOffAt || r.appraisedAt || r.createdAt, type: '报废归档', title: r.scrapNo, detail: `${r.reason || '--'}${r.appraisal ? `；鉴定：${r.appraisal}` : ''}`, actor: r.archiver || r.financeUser || r.appraiser || r.applicant, status: r.status }));
+
+  selectBusinessHistory(state, 'device', deviceId).forEach(h => rows.push({
+    key: `BH-${h.historyId}`, time: h.at, type: '业务动作', title: h.historyId, detail: h.summary, actor: '--', status: h.at ? '已记录' : null,
+  }));
+
+  return rows
+    .filter(r => r.time)
+    .sort((a, b) => (a.time < b.time ? 1 : -1));
 }
 
 export function selectBusinessHistory(state, entityType, entityId) {

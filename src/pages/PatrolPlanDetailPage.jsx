@@ -1,5 +1,5 @@
-import React, { useMemo } from 'react';
-import { Card, Descriptions, Table, Button, Tooltip } from 'antd';
+import React, { useMemo, useState } from 'react';
+import { Card, Descriptions, Table, Button, Tooltip, Space, Modal, Form, Input, App } from 'antd';
 import { ArrowLeft } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import PageHeader from '../components/PageHeader.jsx';
@@ -28,11 +28,18 @@ function CanonicalDeviceCell({ code, seedName }) {
 export default function PatrolPlanDetailPage() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
+  const { message } = App.useApp();
   const state = useDemoState();
   const meta = state.meta;
   const id = params.get('id') || params.get('code');
 
+  // 「编辑」为页面内演示交互（不写入 DemoStore，刷新后恢复快照）
+  const [editOpen, setEditOpen] = useState(false);
+  const [form] = Form.useForm();
+  const [patch, setPatch] = useState({});
+
   const plan = useMemo(() => patrolPlans.find(p => p.code === id) || null, [id]);
+  const planView = plan ? { ...plan, ...patch } : null;
 
   const lineDevices = useMemo(
     () => (plan ? patrolPlanDevices.filter(d => d.standard === plan.name.replace(/巡检计划$/, '巡检标准')) : []),
@@ -65,28 +72,45 @@ export default function PatrolPlanDetailPage() {
 
   const progress = plan.totalTasks ? Math.round((plan.doneTasks || 0) / plan.totalTasks * 100) : 0;
 
+  const openEdit = () => {
+    form.resetFields();
+    form.setFieldsValue({ name: planView.name, owner: planView.owner, remark: planView.remark });
+    setEditOpen(true);
+  };
+  const handleEdit = async () => {
+    const values = await form.validateFields();
+    setPatch(prev => ({ ...prev, ...values }));
+    setEditOpen(false);
+    message.success('计划信息已保存，变更将直接更新到今天及后续按计划生成的巡检任务');
+  };
+
   return (
     <>
       <PageHeader
-        title={`巡检计划详情 · ${plan.name}`}
+        title={`巡检计划详情 · ${planView.name}`}
         subtitle={`计划编号 ${plan.code} · 数据更新于 ${meta.updatedAt}`}
-        actions={<Button icon={<ArrowLeft size={14} />} onClick={() => navigate('/patrol-plans')}>返回列表</Button>}
+        actions={(
+          <Space>
+            <Button icon={<ArrowLeft size={14} />} onClick={() => navigate('/patrol-plans')}>返回列表</Button>
+            <Button type="primary" onClick={openEdit}>编辑</Button>
+          </Space>
+        )}
       />
       <DegradedBanner meta={meta} />
       <Card size="small" style={{ marginBottom: 12 }}>
         <Descriptions column={3} size="small">
           <Descriptions.Item label="计划编号">{plan.code}</Descriptions.Item>
-          <Descriptions.Item label="计划名称（巡检线路）">{plan.name}</Descriptions.Item>
-          <Descriptions.Item label="状态"><StatusTag value={plan.status} tip={plan.remark} /></Descriptions.Item>
+          <Descriptions.Item label="计划名称（巡检线路）">{planView.name}</Descriptions.Item>
+          <Descriptions.Item label="状态"><StatusTag value={plan.status} tip={planView.remark} /></Descriptions.Item>
           <Descriptions.Item label="巡检周期">
             {plan.cycle || '--'}{plan.interval ? ` · 每 ${plan.interval} 个周期` : ''}{plan.skip ? ` · ${plan.skip}` : ''}
           </Descriptions.Item>
           <Descriptions.Item label="起止时间">{plan.startDate || '--'} ~ {plan.endDate || '--'}</Descriptions.Item>
-          <Descriptions.Item label="负责人">{plan.owner || '--'}</Descriptions.Item>
+          <Descriptions.Item label="负责人">{planView.owner || '--'}</Descriptions.Item>
           <Descriptions.Item label="线路设备数">{plan.deviceCount} 台</Descriptions.Item>
           <Descriptions.Item label="执行进度">{plan.doneTasks ?? '--'} / {plan.totalTasks ?? '--'}（{progress}%）</Descriptions.Item>
           <Descriptions.Item label="创建时间">{plan.createTime || '--'}</Descriptions.Item>
-          <Descriptions.Item label="备注" span={3}>{plan.remark || '--'}</Descriptions.Item>
+          <Descriptions.Item label="备注" span={3}>{planView.remark || '--'}</Descriptions.Item>
         </Descriptions>
       </Card>
       <Card type="inner" size="small" title="巡检线路设备（canonical 映射）" style={{ marginBottom: 12 }}>
@@ -134,6 +158,24 @@ export default function PatrolPlanDetailPage() {
           ]}
         />
       </Card>
+
+      <Modal
+        title={`编辑巡检计划（${plan.code}）`}
+        width={640}
+        open={editOpen}
+        onCancel={() => setEditOpen(false)}
+        onOk={handleEdit}
+        okText="保存"
+        cancelText="取消"
+        destroyOnClose
+      >
+        <Form form={form} layout="vertical">
+          <Form.Item label="计划名称（巡检线路）" name="name" rules={[{ required: true, message: '请输入计划名称' }]}><Input /></Form.Item>
+          <Form.Item label="负责人" name="owner"><Input /></Form.Item>
+          <Form.Item label="备注" name="remark"><Input.TextArea rows={2} maxLength={200} /></Form.Item>
+        </Form>
+        <div style={{ color: '#8a97a3', fontSize: 12 }}>巡检周期、起止时间等口径在计划列表「编辑」中维护。</div>
+      </Modal>
     </>
   );
 }

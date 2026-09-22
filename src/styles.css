@@ -608,3 +608,21 @@ body {
   .screen-layout { grid-template-columns: 1fr; }
   .device-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+/* ================= 弹窗表单统一两列布局 ================= */
+/* 新增/编辑弹窗内的表单统一两列，降低弹窗高度；
+   auto-fit 空轨道自动折叠：字段极少时单字段自动占满整行 */
+.ant-modal .ant-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  column-gap: 20px;
+}
+.ant-modal .ant-form > * { min-width: 0; }
+/* 天然宽字段自动跨两列：文本域 / 上传 / 提示条 / Descriptions / Row-Col 块 */
+.ant-modal .ant-form > *:has(textarea),
+.ant-modal .ant-form > *:has(.ant-upload),
+.ant-modal .ant-form > .ant-alert,
+.ant-modal .ant-form > .ant-descriptions,
+.ant-modal .ant-form > .ant-row,
+/* Space 分组块整体跨两列，由内部 flex 换行 */
+.ant-modal .ant-form > .ant-space { grid-column: 1 / -1; }

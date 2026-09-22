@@ -117,7 +117,6 @@ export default function MaintenanceItemsPage() {
         <Space wrap>
           <Input.Search style={{ width: 240 }} placeholder="项目编号 / 名称 / 部位 / 要求" allowClear
             onSearch={setKw} onChange={e => { if (!e.target.value) setKw(''); }} />
-          <Button type="primary" icon={<Plus size={14} />} onClick={openCreate}>新增保养项目</Button>
         </Space>
       </Card>
       <Card size="small">
@@ -127,6 +126,9 @@ export default function MaintenanceItemsPage() {
           items={tabItems}
           size="small"
         />
+        <Space wrap style={{ marginBottom: 12 }}>
+          <Button type="primary" icon={<Plus size={14} />} onClick={openCreate}>新增保养项目</Button>
+        </Space>
         <Table
           rowKey="code" size="small"
           dataSource={list}

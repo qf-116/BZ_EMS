@@ -161,9 +161,13 @@ export default function SparePartReportPage() {
       <PageHeader
         title="备件管理统计报表"
         subtitle={`库存水位 · 出入库 / 退库累计 · 低于安全库存预警 · 口径截止 ${meta.lastSampleAt || '--'}`}
-        actions={<Button type="primary" icon={<Download size={14} />} onClick={handleExport}>导出</Button>}
       />
       <DegradedBanner meta={meta} />
+      <div style={{ marginBottom: 12 }}>
+        <Space wrap>
+          <Button type="primary" icon={<Download size={14} />} onClick={handleExport}>导出</Button>
+        </Space>
+      </div>
       <Card size="small" style={{ marginBottom: 12 }}>
         <Space wrap>
           <RangePicker

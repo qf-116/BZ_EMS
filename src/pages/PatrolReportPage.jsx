@@ -89,7 +89,6 @@ export default function PatrolReportPage() {
         title="巡检执行统计"
         backPath="/"
         subtitle={`统计日 2026-09-16 · 快照 ${state.meta.updatedAt || '--'}`}
-        actions={<Button icon={<Download size={14} />} onClick={() => message.success('已导出')}>导出</Button>}
       />
       <DegradedBanner meta={state.meta} />
       <Row gutter={12} style={{ marginBottom: 12 }}>
@@ -109,6 +108,9 @@ export default function PatrolReportPage() {
           placeholder={['开始日期', '结束日期']}
         />
       </Space>}>
+        <Space wrap style={{ marginBottom: 12 }}>
+          <Button icon={<Download size={14} />} onClick={() => message.success('已导出')}>导出</Button>
+        </Space>
         <Table
           rowKey="plan"
           size="small"

@@ -9,24 +9,31 @@ export const DEMO_LAST_SAMPLE_AT = '2026-09-16 16:41:10';
 
 // samplesByKey: `${deviceId}|${metricCode}` → 最新样本；sourceId 与当前绑定项对应。
 export const samples = [
-  // DEV-001 正常
+  // DEV-001 正常（绑定 8 项指标全量有样本：主控制器 + 振动/温度子传感器）
   { key: 'DEV-001|M.spindle_temp', deviceId: 'DEV-001', sourceId: 'iot-main-001', metricCode: 'M.spindle_temp', value: 68.5, unit: '℃', sourceTime: '16:41:05', receiveTime: '16:41:08', qualityCode: 'GOOD', bindingVersion: 2 },
   { key: 'DEV-001|M.coolant_temp', deviceId: 'DEV-001', sourceId: 'iot-main-001', metricCode: 'M.coolant_temp', value: 32.1, unit: '℃', sourceTime: '16:41:05', receiveTime: '16:41:08', qualityCode: 'GOOD', bindingVersion: 2 },
   { key: 'DEV-001|M.spindle_speed', deviceId: 'DEV-001', sourceId: 'iot-main-001', metricCode: 'M.spindle_speed', value: 8200, unit: 'rpm', sourceTime: '16:41:05', receiveTime: '16:41:08', qualityCode: 'GOOD', bindingVersion: 2 },
+  { key: 'DEV-001|M.feed_rate', deviceId: 'DEV-001', sourceId: 'iot-main-001', metricCode: 'M.feed_rate', value: 1200, unit: 'mm/min', sourceTime: '16:41:05', receiveTime: '16:41:08', qualityCode: 'GOOD', bindingVersion: 2 },
+  { key: 'DEV-001|M.vib_amplitude', deviceId: 'DEV-001', sourceId: 'iot-s-20011', metricCode: 'M.vib_amplitude', value: 2.8, unit: 'mm/s', sourceTime: '16:41:05', receiveTime: '16:41:08', qualityCode: 'GOOD', bindingVersion: 2 },
+  { key: 'DEV-001|M.bearing_temp', deviceId: 'DEV-001', sourceId: 'iot-s-20012', metricCode: 'M.bearing_temp', value: 52.4, unit: '℃', sourceTime: '16:41:05', receiveTime: '16:41:08', qualityCode: 'GOOD', bindingVersion: 2 },
   { key: 'DEV-001|S.machine_state', deviceId: 'DEV-001', sourceId: 'iot-main-001', metricCode: 'S.machine_state', value: '运行', unit: '--', sourceTime: '16:41:05', receiveTime: '16:41:08', qualityCode: 'GOOD', bindingVersion: 2 },
-  // DEV-002 延迟（receiveTime - sourceTime ≈ 32s；剧本 B）
+  { key: 'DEV-001|S.alarm_code', deviceId: 'DEV-001', sourceId: 'iot-main-001', metricCode: 'S.alarm_code', value: '无', unit: '--', sourceTime: '16:41:05', receiveTime: '16:41:08', qualityCode: 'GOOD', bindingVersion: 2 },
+  // DEV-002 延迟（receiveTime - sourceTime ≈ 32s；剧本 B；主控制器 4 项 + 进给速度）
   { key: 'DEV-002|M.spindle_temp', deviceId: 'DEV-002', sourceId: 'iot-main-002', metricCode: 'M.spindle_temp', value: 76.2, unit: '℃', sourceTime: '16:37:50', receiveTime: '16:38:22', qualityCode: 'DELAYED', bindingVersion: 2 },
   { key: 'DEV-002|M.coolant_temp', deviceId: 'DEV-002', sourceId: 'iot-main-002', metricCode: 'M.coolant_temp', value: 44.6, unit: '℃', sourceTime: '16:37:50', receiveTime: '16:38:22', qualityCode: 'DELAYED', bindingVersion: 2 },
   { key: 'DEV-002|M.spindle_speed', deviceId: 'DEV-002', sourceId: 'iot-main-002', metricCode: 'M.spindle_speed', value: 7600, unit: 'rpm', sourceTime: '16:37:50', receiveTime: '16:38:22', qualityCode: 'DELAYED', bindingVersion: 2 },
+  { key: 'DEV-002|M.feed_rate', deviceId: 'DEV-002', sourceId: 'iot-main-002', metricCode: 'M.feed_rate', value: 1080, unit: 'mm/min', sourceTime: '16:37:50', receiveTime: '16:38:22', qualityCode: 'DELAYED', bindingVersion: 2 },
   { key: 'DEV-002|S.machine_state', deviceId: 'DEV-002', sourceId: 'iot-main-002', metricCode: 'S.machine_state', value: '运行', unit: '--', sourceTime: '16:37:50', receiveTime: '16:38:22', qualityCode: 'DELAYED', bindingVersion: 2 },
-  // DEV-003 待机（无温度/速度数据：null，不显示 0）
+  // DEV-003 待机（无温度/速度数据：null，不显示 0；振动子传感器正常）
   { key: 'DEV-003|M.spindle_temp', deviceId: 'DEV-003', sourceId: 'iot-main-003', metricCode: 'M.spindle_temp', value: null, unit: '℃', sourceTime: '16:40:55', receiveTime: '16:40:58', qualityCode: 'NO_VALUE', bindingVersion: 1 },
   { key: 'DEV-003|M.spindle_speed', deviceId: 'DEV-003', sourceId: 'iot-main-003', metricCode: 'M.spindle_speed', value: 0, unit: 'rpm', sourceTime: '16:40:55', receiveTime: '16:40:58', qualityCode: 'GOOD', bindingVersion: 1 },
+  { key: 'DEV-003|M.vib_amplitude', deviceId: 'DEV-003', sourceId: 'iot-s-20031', metricCode: 'M.vib_amplitude', value: 1.2, unit: 'mm/s', sourceTime: '16:40:55', receiveTime: '16:40:58', qualityCode: 'GOOD', bindingVersion: 1 },
   { key: 'DEV-003|S.machine_state', deviceId: 'DEV-003', sourceId: 'iot-main-003', metricCode: 'S.machine_state', value: '待机', unit: '--', sourceTime: '16:40:55', receiveTime: '16:40:58', qualityCode: 'GOOD', bindingVersion: 1 },
-  // DEV-004 故障（主轴温度 91.8；剧本 A）
+  // DEV-004 故障（主轴温度 91.8；剧本 A；含温度子传感器轴承温度）
   { key: 'DEV-004|M.spindle_temp', deviceId: 'DEV-004', sourceId: 'iot-main-004', metricCode: 'M.spindle_temp', value: 91.8, unit: '℃', sourceTime: '16:41:04', receiveTime: '16:41:07', qualityCode: 'GOOD', bindingVersion: 2 },
   { key: 'DEV-004|M.oil_pressure', deviceId: 'DEV-004', sourceId: 'iot-main-004', metricCode: 'M.oil_pressure', value: 0.08, unit: 'MPa', sourceTime: '16:41:04', receiveTime: '16:41:07', qualityCode: 'GOOD', bindingVersion: 2 },
   { key: 'DEV-004|M.axis_load', deviceId: 'DEV-004', sourceId: 'iot-main-004', metricCode: 'M.axis_load', value: 95, unit: '%', sourceTime: '16:41:04', receiveTime: '16:41:07', qualityCode: 'GOOD', bindingVersion: 2 },
+  { key: 'DEV-004|M.bearing_temp', deviceId: 'DEV-004', sourceId: 'iot-s-20041', metricCode: 'M.bearing_temp', value: 61.5, unit: '℃', sourceTime: '16:41:04', receiveTime: '16:41:07', qualityCode: 'GOOD', bindingVersion: 2 },
   { key: 'DEV-004|S.machine_state', deviceId: 'DEV-004', sourceId: 'iot-main-004', metricCode: 'S.machine_state', value: '故障', unit: '--', sourceTime: '16:41:04', receiveTime: '16:41:07', qualityCode: 'GOOD', bindingVersion: 2 },
   // DEV-005 数据中断（无有效样本；剧本 C —— 全部 qualityCode=BAD/OFFLINE，值 null）
   { key: 'DEV-005|M.weld_current', deviceId: 'DEV-005', sourceId: 'iot-main-005', metricCode: 'M.weld_current', value: null, unit: 'A', sourceTime: null, receiveTime: null, qualityCode: 'OFFLINE', bindingVersion: 1 },

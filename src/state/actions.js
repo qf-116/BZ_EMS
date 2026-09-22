@@ -22,6 +22,150 @@ export function createDemoActions(state, dispatch) {
   const fail = (message) => ({ ok: false, message, refs: {} });
 
   return {
+    // ---------- 设备生命周期（简化流程） ----------
+    createLifecycleTask(payload = {}) {
+      const taskId = `LT-${String(Object.keys(E.lifecycleTasksById || {}).length + 1).padStart(3, '0')}`;
+      const taskNo = `LCT-${String(state.meta.demoDay || '2026-09-18').replaceAll('-', '')}-${String(Object.keys(E.lifecycleTasksById || {}).length + 1).padStart(3, '0')}`;
+      if (!(payload.equipmentName || '').trim()) return fail('设备名称必填');
+      if (!(payload.model || '').trim()) return fail('型号必填');
+      if (!(payload.brand || '').trim()) return fail('品牌必填');
+      if (!(payload.quantity > 0)) return fail('数量必须大于 0');
+      if (!(payload.shipDate || '').trim()) return fail('发货时间必填');
+      if (!(payload.contractNo || '').trim()) return fail('合同号必填');
+      if (!(payload.useDept || '').trim()) return fail('使用部门必填');
+      if ((payload.sourceType || 'MANUAL') === 'MANUAL' && !(payload.sourceNote || '').trim()) return fail('手工新增必须填写来源说明');
+      act('lifecycle/createTask', {
+        taskId,
+        taskNo,
+        sourceType: payload.sourceType || 'MANUAL',
+        equipmentName: payload.equipmentName.trim(),
+        model: payload.model.trim(),
+        quantity: Number(payload.quantity),
+        brand: payload.brand.trim(),
+        supplier: payload.supplier || '--',
+        purchaseOrderNo: payload.purchaseOrderNo || '--',
+        contractNo: payload.contractNo.trim(),
+        shipDate: payload.shipDate,
+        useDept: payload.useDept,
+        trialOwner: payload.trialOwner || actor.userName,
+        attachments: payload.attachments || [],
+      }, `lifecycle-create:${taskId}`);
+      return { ok: true, message: `采购入账任务 ${taskNo} 已创建`, refs: { taskId, taskNo } };
+    },
+    submitLifecycleProcurement(taskId, payload = {}) {
+      const task = E.lifecycleTasksById?.[taskId];
+      if (!task) return fail('生命周期任务不存在');
+      if (!['采购入账待提交', '采购入账待修改', '试用不合格退回'].includes(task.status)) return fail(`当前状态「${task.status}」不能提交采购入账`);
+      if (!(payload.equipmentName || task.equipmentName || '').trim()) return fail('设备名称必填');
+      if (!(payload.model || task.model || '').trim()) return fail('型号必填');
+      if (!(payload.brand || task.brand || '').trim()) return fail('品牌必填');
+      if (!((payload.quantity ?? task.quantity) > 0)) return fail('数量必须大于 0');
+      if (!(payload.shipDate || task.shipDate)) return fail('发货时间必填');
+      if (!(payload.contractNo || task.contractNo || '').trim()) return fail('合同号必填');
+      act('lifecycle/submitProcurement', { taskId, ...payload }, `lifecycle-procurement:${taskId}:v${(task.version || 0) + 1}`);
+      return { ok: true, message: '采购入账已提交，已生成使用部门试用确认任务', refs: { taskId } };
+    },
+    confirmLifecycleTrial(taskId, payload = {}) {
+      const task = E.lifecycleTasksById?.[taskId];
+      if (!task) return fail('生命周期任务不存在');
+      if (task.status !== '使用部门试用确认中') return fail(`当前状态「${task.status}」不能试用确认`);
+      if (!['合格', '不合格'].includes(payload.result)) return fail('请选择试用结论');
+      if (!(payload.opinion || '').trim()) return fail('试用意见必填');
+      if (payload.result === '不合格' && !(payload.problem || '').trim()) return fail('不合格时必须填写主要问题');
+      act('lifecycle/confirmTrial', { taskId, result: payload.result, opinion: payload.opinion, problem: payload.problem || '' }, `lifecycle-trial:${taskId}:v${(task.version || 0) + 1}`);
+      return { ok: true, message: payload.result === '合格' ? '试用确认合格，已转设备手续入账' : '试用确认不合格，已退回采购', refs: { taskId } };
+    },
+    registerLifecycleDevice(taskId, payload = {}) {
+      const task = E.lifecycleTasksById?.[taskId];
+      if (!task) return fail('生命周期任务不存在');
+      if (task.status !== '待设备手续入账') return fail(`当前状态「${task.status}」不能办理设备入账`);
+      if (!(payload.acceptanceFile || '').trim()) return fail('验收单附件必传');
+      if (!(payload.archiveFile || '').trim()) return fail('设备档案附件必传');
+      if (!(payload.owner || '').trim()) return fail('设备负责人必填');
+      if (!(payload.workshopName || '').trim()) return fail('车间必填');
+      act('lifecycle/registerDevice', { taskId, ...payload }, `lifecycle-register:${taskId}:v${(task.version || 0) + 1}`);
+      return { ok: true, message: '设备手续已办理，设备台账已入账', refs: { taskId } };
+    },
+    createAssetChange(payload = {}) {
+      if (!payload.deviceId) return fail('设备必选');
+      const device = E.devicesById?.[payload.deviceId];
+      if (!device) return fail('设备不存在');
+      if (device.lifecycleStatus === '报废/归档') return fail('已报废归档设备不能发起变更');
+      if (!['调拨', '改造', '借用', '外送'].includes(payload.type)) return fail('变更类型不合法');
+      if (!(payload.reason || '').trim()) return fail('变更原因必填');
+      const changeId = `ACG-${String(Object.keys(E.assetChangeRecordsById || {}).length + 1).padStart(3, '0')}`;
+      const from = { dept: device.workshopName || '--', owner: device.owner || '--', lifecycleStatus: device.lifecycleStatus };
+      act('lifecycle/createChange', { changeId, changeNo: `变更-${String(state.meta.demoDay || '').replaceAll('-', '')}-${String(Object.keys(E.assetChangeRecordsById || {}).length + 1).padStart(3, '0')}`, from, ...payload }, `lifecycle-change:${changeId}`);
+      return { ok: true, message: '资产变更申请已提交', refs: { changeId } };
+    },
+    approveAssetChange(changeId, approved = true, opinion = '') {
+      const record = E.assetChangeRecordsById?.[changeId];
+      if (!record) return fail('变更申请不存在');
+      if (record.status !== '待审批') return fail(`当前状态「${record.status}」不能审批`);
+      act('lifecycle/approveChange', { changeId, approved, opinion }, `lifecycle-change-approve:${changeId}:v${record.version || 0}`);
+      return { ok: true, message: approved ? '变更申请已审批通过' : '变更申请已驳回', refs: { changeId } };
+    },
+    completeAssetChange(changeId, payload = {}) {
+      const record = E.assetChangeRecordsById?.[changeId];
+      if (!record) return fail('变更申请不存在');
+      if (record.status !== '审批通过') return fail(`当前状态「${record.status}」不能执行`);
+      act('lifecycle/completeChange', { changeId, ...payload }, `lifecycle-change-complete:${changeId}:v${record.version || 0}`);
+      return { ok: true, message: '资产变更已执行并写入设备履历', refs: { changeId } };
+    },
+    createIdleApplication(payload = {}) {
+      if (!payload.deviceId) return fail('设备必选');
+      const device = E.devicesById?.[payload.deviceId];
+      if (!device) return fail('设备不存在');
+      if (device.lifecycleStatus !== '在用') return fail(`当前设备状态「${device.lifecycleStatus}」不能申请闲置`);
+      if (Object.values(E.idleApplicationsById || {}).some(r => r.deviceId === payload.deviceId && ['复核中', '待审批'].includes(r.status))) return fail('该设备已有闲置复核单');
+      if (!(payload.reason || '').trim()) return fail('闲置原因必填');
+      const idleId = `IDLE-${String(Object.keys(E.idleApplicationsById || {}).length + 1).padStart(3, '0')}`;
+      act('lifecycle/createIdle', { idleId, idleNo: `闲置-${String(state.meta.demoDay || '').replaceAll('-', '')}-${String(Object.keys(E.idleApplicationsById || {}).length + 1).padStart(3, '0')}`, ...payload }, `lifecycle-idle:${idleId}`);
+      return { ok: true, message: '闲置申请已提交', refs: { idleId } };
+    },
+    reviewIdleApplication(idleId, result, opinion = '') {
+      const record = E.idleApplicationsById?.[idleId];
+      if (!record) return fail('闲置申请不存在');
+      if (!['复核中', '待审批'].includes(record.status)) return fail(`当前状态「${record.status}」不能复核`);
+      if (!['继续闲置', '再启用', '转报废'].includes(result)) return fail('复核结论不合法');
+      act('lifecycle/reviewIdle', { idleId, result, opinion }, `lifecycle-idle-review:${idleId}:v${record.version || 0}`);
+      return { ok: true, message: `闲置复核已提交：${result}`, refs: { idleId } };
+    },
+    createScrapApplication(payload = {}) {
+      if (!payload.deviceId) return fail('设备必选');
+      const device = E.devicesById?.[payload.deviceId];
+      if (!device) return fail('设备不存在');
+      if (['报废/归档', '报废申请中'].includes(device.lifecycleStatus)) return fail(`当前设备状态「${device.lifecycleStatus}」不能重复申请报废`);
+      if (Object.values(E.scrapApplicationsById || {}).some(r => r.deviceId === payload.deviceId && !['鉴定未通过'].includes(r.status))) return fail('该设备已有报废流程单');
+      if (!(payload.reason || '').trim()) return fail('报废原因必填');
+      const scrapId = `SCR-${String(Object.keys(E.scrapApplicationsById || {}).length + 1).padStart(3, '0')}`;
+      act('lifecycle/createScrap', { scrapId, scrapNo: `报废-${String(state.meta.demoDay || '').replaceAll('-', '')}-${String(Object.keys(E.scrapApplicationsById || {}).length + 1).padStart(3, '0')}`, ...payload }, `lifecycle-scrap:${scrapId}`);
+      return { ok: true, message: '报废申请已提交，等待技术鉴定', refs: { scrapId } };
+    },
+    appraiseScrap(scrapId, result, opinion = '') {
+      const record = E.scrapApplicationsById?.[scrapId];
+      if (!record) return fail('报废申请不存在');
+      if (record.status !== '技术鉴定中') return fail(`当前状态「${record.status}」不能鉴定`);
+      if (!['同意报废', '不建议报废'].includes(result)) return fail('鉴定结论不合法');
+      if (!(opinion || '').trim()) return fail('鉴定意见必填');
+      act('lifecycle/appraiseScrap', { scrapId, result, opinion }, `lifecycle-scrap-appraise:${scrapId}:v${record.version || 0}`);
+      return { ok: true, message: result === '同意报废' ? '技术鉴定通过，等待财务核销' : '技术鉴定未通过', refs: { scrapId } };
+    },
+    confirmScrapWriteOff(scrapId, payload = {}) {
+      const record = E.scrapApplicationsById?.[scrapId];
+      if (!record) return fail('报废申请不存在');
+      if (record.status !== '待财务核销') return fail(`当前状态「${record.status}」不能核销`);
+      if (!(payload.writeOffNo || '').trim()) return fail('财务核销单号必填');
+      act('lifecycle/writeOffScrap', { scrapId, ...payload }, `lifecycle-scrap-writeoff:${scrapId}:v${record.version || 0}`);
+      return { ok: true, message: '财务核销已确认，设备已报废', refs: { scrapId } };
+    },
+    archiveScrap(scrapId) {
+      const record = E.scrapApplicationsById?.[scrapId];
+      if (!record) return fail('报废申请不存在');
+      if (record.status !== '已报废') return fail(`当前状态「${record.status}」不能归档`);
+      act('lifecycle/archiveScrap', { scrapId }, `lifecycle-scrap-archive:${scrapId}:v${record.version || 0}`);
+      return { ok: true, message: '报废记录已归档', refs: { scrapId } };
+    },
     // ---------- 绑定 ----------
     saveBinding(deviceId, summary) {
       const draft = (state.ui.bindingDraftsByDeviceId || {})[`draft-${deviceId}`];

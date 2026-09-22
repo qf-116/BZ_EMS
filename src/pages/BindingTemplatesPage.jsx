@@ -222,17 +222,17 @@ export default function BindingTemplatesPage() {
       <PageHeader
         title="绑定模板管理"
         subtitle="绑定模板的新建 / 编辑 / 删除与应用（一次配置、批量应用——几十台上百台同型号设备不必逐台手配）"
-        actions={(
-          <Button type="primary" icon={<Plus size={14} />} onClick={() => setEditorTarget({})}>
-            新建模板
-          </Button>
-        )}
       />
       <Alert
         type="info" showIcon style={{ marginBottom: 12 }}
         message="模板记录「来源结构 + 指标口径」，不记录具体 IoT 编码：应用到设备时由物联网平台按每台设备自动分配专属来源编码（演示模拟），全局唯一、不与已占用编码冲突；应用后可在联网配置总览中逐台启用。"
       />
       <Card size="small" title={<Space size={6}><LayoutTemplate size={14} />绑定模板（{templates.length}）</Space>}>
+        <Space wrap style={{ marginBottom: 12 }}>
+          <Button type="primary" icon={<Plus size={14} />} onClick={() => setEditorTarget({})}>
+            新建模板
+          </Button>
+        </Space>
         {templates.length === 0 ? (
           <Empty
             image={Empty.PRESENTED_IMAGE_SIMPLE}

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Table, Button } from 'antd';
+import { Table, Button, Space } from 'antd';
 import { Plus } from 'lucide-react';
 import PageHeader from '../components/PageHeader.jsx';
 import { baseTypes } from '../data/standardData.js';
@@ -7,7 +7,10 @@ import { baseTypes } from '../data/standardData.js';
 export default function BaseTypeConfigPage() {
   return (
     <>
-      <PageHeader title="基础类型配置" subtitle="设备类型、等级、故障类型等字典维护" actions={<Button type="primary" icon={<Plus size={14} />}>新增分类</Button>} />
+      <PageHeader title="基础类型配置" subtitle="设备类型、等级、故障类型等字典维护" />
+      <Space wrap style={{ marginBottom: 12 }}>
+        <Button type="primary" icon={<Plus size={14} />}>新增分类</Button>
+      </Space>
       <Table rowKey="category" size="small" dataSource={baseTypes} columns={[
         { title: '分类', dataIndex: 'category', width: 120 },
         { title: '可选值', dataIndex: 'values' },

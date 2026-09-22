@@ -5,6 +5,10 @@ const path = require('path');
 const routes = [
   '/', '/device-ledger', '/device-ledger/detail/DEV-004', '/device-ledger/detail?code=MT2024A1204', '/device-ledger/net-config?code=MT2024A1201',
   '/doc-library', '/base-type-config',
+  // 设备生命周期：简化主流程与资产治理
+  '/lifecycle/workbench', '/lifecycle/tasks', '/lifecycle/tasks/procurement-entry',
+  '/lifecycle/tasks/trial-confirmation', '/lifecycle/tasks/device-registration',
+  '/lifecycle/changes', '/lifecycle/idle', '/lifecycle/scrap',
   // 点检 / 保养 / 巡检（演示模块）
   '/inspection-items', '/inspection-standards', '/inspection-standards/detail',
   '/inspection-plans', '/inspection-plans/detail', '/inspection-tasks',
@@ -13,7 +17,9 @@ const routes = [
   '/maintenance-tasks/detail', '/maintenance-tasks/execute',
   '/patrol-items', '/patrol-standards', '/patrol-standards/detail', '/patrol-plans', '/patrol-plans/detail',
   '/patrol-tasks', '/patrol-tasks/detail', '/patrol-tasks/execute',
-  // 系统管理：宿主平台提供，统一 ScopeNoticePage
+  // 基础配置模块（系统拆分独立后自建）：用户/角色/组织/字典/日志
+  '/system/users', '/system/roles', '/system/org', '/system/dict', '/system/logs',
+  // 旧权限/审计入口：已重定向到基础配置模块
   '/permissions', '/audit',
   '/repair-pending', '/repair-reports', '/repair-orders',
   '/repair-orders/RO-20260916-001', '/repair-orders/RO-20260916-001/execute', '/repair-orders/RO-20260915-002/accept',

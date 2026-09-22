@@ -88,6 +88,184 @@ export function reducer(state, action) {
   const E = state.entities;
 
   switch (action.type) {
+    // ================= 设备生命周期（简化流程） =================
+    case 'lifecycle/createTask': {
+      const record = {
+        ...payload,
+        version: 1,
+        currentNode: '采购入账待提交',
+        status: '采购入账待提交',
+        procurement: { submittedAt: null, submittedBy: null },
+        trial: { result: null, opinion: '', problem: '', confirmedAt: null, confirmer: null },
+        registration: { status: '未开始', deviceIds: [], acceptanceFile: null, archiveFile: null, submittedAt: null, registrar: null },
+        attachments: payload.attachments || [],
+        timeline: [{ type: '创建', time: at, actor: actor.userName, detail: '采购入账任务已创建' }],
+      };
+      let next = setE(state, 'lifecycleTasksById', payload.taskId, record);
+      next = addHistory(next, at, 'lifecycleTask', payload.taskId, `创建采购入账任务 ${payload.taskNo}`, {});
+      return finish(next, action, true, `采购入账任务 ${payload.taskNo} 已创建`, { taskId: payload.taskId }, false, at);
+    }
+    case 'lifecycle/submitProcurement': {
+      const task = E.lifecycleTasksById?.[payload.taskId];
+      if (!task) return reject(state, action, '生命周期任务不存在');
+      if (!['采购入账待提交', '采购入账待修改', '试用不合格退回'].includes(task.status)) return reject(state, action, `当前状态「${task.status}」不能提交采购入账`);
+      const updated = {
+        ...task,
+        ...payload,
+        status: '使用部门试用确认中',
+        currentNode: '使用部门试用确认中',
+        version: (task.version || 0) + 1,
+        procurement: { submittedAt: at, submittedBy: actor.userName },
+        trial: { result: null, opinion: '', problem: '', confirmedAt: null, confirmer: null },
+        timeline: [...(task.timeline || []), { type: '采购入账', time: at, actor: actor.userName, detail: '已提交使用部门试用确认' }],
+      };
+      let next = setE(state, 'lifecycleTasksById', task.taskId, updated);
+      next = addHistory(next, at, 'lifecycleTask', task.taskId, '采购入账提交，进入使用部门试用确认', {});
+      return finish(next, action, true, '采购入账已提交，已生成使用部门试用确认任务', { taskId: task.taskId }, false, at);
+    }
+    case 'lifecycle/confirmTrial': {
+      const task = E.lifecycleTasksById?.[payload.taskId];
+      if (!task) return reject(state, action, '生命周期任务不存在');
+      if (task.status !== '使用部门试用确认中') return reject(state, action, `当前状态「${task.status}」不能试用确认`);
+      const isOk = payload.result === '合格';
+      const nextStatus = isOk ? '待设备手续入账' : '试用不合格退回';
+      const updated = {
+        ...task,
+        status: nextStatus,
+        currentNode: nextStatus,
+        version: (task.version || 0) + 1,
+        trial: { result: payload.result, opinion: payload.opinion, problem: payload.problem || '', confirmedAt: at, confirmer: actor.userName },
+        registration: isOk ? { ...task.registration, status: '待办理' } : task.registration,
+        timeline: [...(task.timeline || []), { type: `试用${payload.result}`, time: at, actor: actor.userName, detail: isOk ? payload.opinion : `${payload.problem}；${payload.opinion}` }],
+      };
+      let next = setE(state, 'lifecycleTasksById', task.taskId, updated);
+      next = addHistory(next, at, 'lifecycleTask', task.taskId, isOk ? '试用确认合格，转设备手续入账' : '试用确认不合格，退回采购', {});
+      return finish(next, action, true, isOk ? '试用确认合格，已转设备手续入账' : '试用确认不合格，已退回采购', { taskId: task.taskId }, false, at);
+    }
+    case 'lifecycle/registerDevice': {
+      const task = E.lifecycleTasksById?.[payload.taskId];
+      if (!task) return reject(state, action, '生命周期任务不存在');
+      if (task.status !== '待设备手续入账') return reject(state, action, `当前状态「${task.status}」不能办理设备入账`);
+      const baseCount = Object.keys(E.devicesById || {}).length;
+      const count = Number(task.quantity) || 1;
+      let next = state;
+      const deviceIds = [];
+      for (let i = 0; i < count; i += 1) {
+        const n = baseCount + i + 1;
+        const deviceId = `DEV-${String(n).padStart(3, '0')}`;
+        const assetCode = `MT${String(state.meta.demoDay || '20260918').replaceAll('-', '').slice(0, 4)}L${String(n).padStart(4, '0')}`;
+        const device = {
+          deviceId,
+          assetCode,
+          name: payload.name || task.equipmentName,
+          model: payload.model || task.model,
+          type: payload.type || '通用设备',
+          brand: payload.brand || task.brand,
+          organizationId: 'org-demo',
+          workshopName: payload.workshopName,
+          lineName: payload.lineName || '--',
+          stationName: payload.stationName || '--',
+          assetNo: payload.assetNo || `待财务-${String(n).padStart(4, '0')}`,
+          lifecycleStatus: '在用',
+          owner: payload.owner,
+          enableDate: dateOnly(at),
+          buyDate: task.shipDate || dateOnly(at),
+          oeeEligible: payload.oeeEligible === true,
+          sourceTaskId: task.taskId,
+          contractNo: task.contractNo,
+          warranty: payload.warranty || '--',
+          acceptanceFile: payload.acceptanceFile,
+          archiveFile: payload.archiveFile,
+        };
+        next = setE(next, 'devicesById', deviceId, device);
+        deviceIds.push(deviceId);
+        next = addHistory(next, at, 'device', deviceId, `设备手续入账：${device.name}`, { taskId: task.taskId });
+      }
+      const updated = {
+        ...task,
+        status: '设备已入账',
+        currentNode: '设备已入账',
+        version: (task.version || 0) + 1,
+        registration: { status: '已完成', deviceIds, acceptanceFile: payload.acceptanceFile, archiveFile: payload.archiveFile, submittedAt: at, registrar: actor.userName },
+        timeline: [...(task.timeline || []), { type: '设备手续入账', time: at, actor: actor.userName, detail: `已生成 ${deviceIds.length} 台设备台账` }],
+      };
+      next = setE(next, 'lifecycleTasksById', task.taskId, updated);
+      next = addHistory(next, at, 'lifecycleTask', task.taskId, `设备手续入账完成，生成 ${deviceIds.length} 台设备`, { deviceIds });
+      return finish(next, action, true, '设备手续已办理，设备台账已入账', { taskId: task.taskId, deviceIds }, false, at);
+    }
+    case 'lifecycle/createChange': {
+      const record = { ...payload, status: '待审批', version: 1, createdAt: payload.createdAt || at };
+      let next = setE(state, 'assetChangeRecordsById', payload.changeId, record);
+      next = addHistory(next, at, 'device', payload.deviceId, `提交资产变更：${payload.type}`, { changeId: payload.changeId });
+      return finish(next, action, true, '资产变更申请已提交', { changeId: payload.changeId }, false, at);
+    }
+    case 'lifecycle/approveChange': {
+      const record = E.assetChangeRecordsById?.[payload.changeId];
+      if (!record) return reject(state, action, '变更申请不存在');
+      const status = payload.approved ? '审批通过' : '已驳回';
+      const updated = { ...record, status, opinion: payload.opinion || '', approvedAt: at, approver: actor.userName, version: (record.version || 0) + 1 };
+      let next = setE(state, 'assetChangeRecordsById', record.changeId, updated);
+      next = addHistory(next, at, 'device', record.deviceId, `资产变更${payload.approved ? '审批通过' : '被驳回'}：${record.type}`, { changeId: record.changeId });
+      return finish(next, action, true, `变更申请已${payload.approved ? '审批通过' : '驳回'}`, { changeId: record.changeId }, false, at);
+    }
+    case 'lifecycle/completeChange': {
+      const record = E.assetChangeRecordsById?.[payload.changeId];
+      if (!record) return reject(state, action, '变更申请不存在');
+      const updated = { ...record, status: '已完成', completedAt: at, executor: actor.userName, version: (record.version || 0) + 1 };
+      let next = setE(state, 'assetChangeRecordsById', record.changeId, updated);
+      const device = E.devicesById[record.deviceId];
+      if (device && record.type === '调拨' && record.to?.dept) {
+        next = setE(next, 'devicesById', record.deviceId, { ...device, department: record.to.dept, owner: record.to.owner || device.owner });
+      }
+      next = addHistory(next, at, 'device', record.deviceId, `资产变更完成：${record.type}`, { changeId: record.changeId });
+      return finish(next, action, true, '资产变更已执行并写入设备履历', { changeId: record.changeId }, false, at);
+    }
+    case 'lifecycle/createIdle': {
+      const record = { ...payload, status: '复核中', version: 1, createdAt: payload.createdAt || at };
+      let next = setE(state, 'idleApplicationsById', payload.idleId, record);
+      next = addHistory(next, at, 'device', payload.deviceId, '提交闲置申请', { idleId: payload.idleId });
+      return finish(next, action, true, '闲置申请已提交', { idleId: payload.idleId }, false, at);
+    }
+    case 'lifecycle/reviewIdle': {
+      const record = E.idleApplicationsById?.[payload.idleId];
+      if (!record) return reject(state, action, '闲置申请不存在');
+      const status = payload.result === '再启用' ? '已再启用' : payload.result === '转报废' ? '转报废' : '继续闲置';
+      let next = setE(state, 'idleApplicationsById', record.idleId, { ...record, status, reviewResult: payload.result, reviewOpinion: payload.opinion || '', reviewedAt: at, reviewer: actor.userName, version: (record.version || 0) + 1 });
+      const device = E.devicesById[record.deviceId];
+      if (device && payload.result === '再启用') next = setE(next, 'devicesById', record.deviceId, { ...device, lifecycleStatus: '在用', enableDate: dateOnly(at) });
+      next = addHistory(next, at, 'device', record.deviceId, `闲置复核：${payload.result}`, { idleId: record.idleId });
+      return finish(next, action, true, `闲置复核已提交：${payload.result}`, { idleId: record.idleId }, false, at);
+    }
+    case 'lifecycle/createScrap': {
+      const record = { ...payload, status: '技术鉴定中', version: 1, createdAt: payload.createdAt || at };
+      let next = setE(state, 'scrapApplicationsById', payload.scrapId, record);
+      next = addHistory(next, at, 'device', payload.deviceId, '提交报废申请', { scrapId: payload.scrapId });
+      return finish(next, action, true, '报废申请已提交，等待技术鉴定', { scrapId: payload.scrapId }, false, at);
+    }
+    case 'lifecycle/appraiseScrap': {
+      const record = E.scrapApplicationsById?.[payload.scrapId];
+      if (!record) return reject(state, action, '报废申请不存在');
+      const status = payload.result === '同意报废' ? '待财务核销' : '鉴定未通过';
+      let next = setE(state, 'scrapApplicationsById', record.scrapId, { ...record, status, appraisal: payload.opinion, appraiser: actor.userName, appraisedAt: at, version: (record.version || 0) + 1 });
+      next = addHistory(next, at, 'device', record.deviceId, `报废技术鉴定：${payload.result}`, { scrapId: record.scrapId });
+      return finish(next, action, true, status === '待财务核销' ? '技术鉴定通过，等待财务核销' : '技术鉴定未通过', { scrapId: record.scrapId }, false, at);
+    }
+    case 'lifecycle/writeOffScrap': {
+      const record = E.scrapApplicationsById?.[payload.scrapId];
+      if (!record) return reject(state, action, '报废申请不存在');
+      let next = setE(state, 'scrapApplicationsById', record.scrapId, { ...record, status: '已报废', writeOffNo: payload.writeOffNo, writeOffAt: at, financeUser: actor.userName, version: (record.version || 0) + 1 });
+      const device = E.devicesById[record.deviceId];
+      if (device) next = setE(next, 'devicesById', record.deviceId, { ...device, lifecycleStatus: '报废/归档', disableDate: dateOnly(at), oeeEligible: false });
+      next = addHistory(next, at, 'device', record.deviceId, '财务核销完成，设备已报废', { scrapId: record.scrapId, writeOffNo: payload.writeOffNo });
+      return finish(next, action, true, '财务核销已确认，设备已报废', { scrapId: record.scrapId }, false, at);
+    }
+    case 'lifecycle/archiveScrap': {
+      const record = E.scrapApplicationsById?.[payload.scrapId];
+      if (!record) return reject(state, action, '报废申请不存在');
+      let next = setE(state, 'scrapApplicationsById', record.scrapId, { ...record, status: '已归档', archivedAt: at, archiver: actor.userName, version: (record.version || 0) + 1 });
+      next = addHistory(next, at, 'device', record.deviceId, '报废记录已归档', { scrapId: record.scrapId });
+      return finish(next, action, true, '报废记录已归档', { scrapId: record.scrapId }, false, at);
+    }
     // ================= 绑定 =================
     case 'binding/validate': {
       const draft = payload.draft;

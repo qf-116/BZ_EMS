@@ -100,9 +100,14 @@ export default function InspectionReportPage() {
       <PageHeader
         title="点检执行统计"
         subtitle={`按设备 / 执行人 / 状态聚合点检任务 · 统计基准日：${demoDay}`}
-        actions={<Space><Button type="primary" onClick={handleExport}>导出报表</Button></Space>}
       />
       <DegradedBanner meta={meta} />
+
+      <div style={{ marginBottom: 12 }}>
+        <Space wrap>
+          <Button type="primary" onClick={handleExport}>导出报表</Button>
+        </Space>
+      </div>
 
       <Card size="small" style={{ marginBottom: 12 }}>
         <Space size={40} wrap>

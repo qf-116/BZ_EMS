@@ -10,7 +10,6 @@ export default function DocLibraryPage() {
       <PageHeader
         title="综合文档库"
         subtitle="技术资料 · 操作规程 · 维修手册 · 合同附件"
-        actions={<Upload><Button type="primary" icon={<FileText size={14} />}>上传文档</Button></Upload>}
       />
       <Card size="small" style={{ marginBottom: 12 }}>
         <Space wrap>
@@ -20,6 +19,9 @@ export default function DocLibraryPage() {
           <Button type="primary">查询</Button>
         </Space>
       </Card>
+      <Space wrap style={{ marginBottom: 12 }}>
+        <Upload><Button type="primary" icon={<FileText size={14} />}>上传文档</Button></Upload>
+      </Space>
       <Table rowKey="code" size="small" dataSource={docLibrary} columns={[
         { title: '文档编号', dataIndex: 'code', width: 100 },
         { title: '文档名称', dataIndex: 'name', render: v => <Button type="link" size="small" style={{ padding: 0 }} icon={<FileText size={13} />}>{v}</Button> },

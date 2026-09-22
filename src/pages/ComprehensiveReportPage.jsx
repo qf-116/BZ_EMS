@@ -168,9 +168,13 @@ export default function ComprehensiveReportPage() {
       <PageHeader
         title="设备综合运行分析报表"
         subtitle={`状态 · 稼动率 · OEE · 报警 · 质量 · 产出综合视图 · 统计日 ${meta.demoDay || '--'} · 口径截止 ${meta.lastSampleAt || '--'}`}
-        actions={<Button type="primary" icon={<Download size={14} />} onClick={handleExport}>导出</Button>}
       />
       <DegradedBanner meta={meta} />
+      <div style={{ marginBottom: 12 }}>
+        <Space wrap>
+          <Button type="primary" icon={<Download size={14} />} onClick={handleExport}>导出</Button>
+        </Space>
+      </div>
       <Card size="small" style={{ marginBottom: 12 }}>
         <Space wrap>
           <RangePicker

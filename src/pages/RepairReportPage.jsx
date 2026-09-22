@@ -154,9 +154,13 @@ export default function RepairReportPage() {
       <PageHeader
         title="维修统计报表"
         subtitle={`维修工单闭环 · 返修 · SLA 达成 · 故障类型分布 · 统计日 ${meta.demoDay || '--'} · 口径截止 ${meta.lastSampleAt || '--'}`}
-        actions={<Button type="primary" icon={<Download size={14} />} onClick={handleExport}>导出</Button>}
       />
       <DegradedBanner meta={meta} />
+      <div style={{ marginBottom: 12 }}>
+        <Space wrap>
+          <Button type="primary" icon={<Download size={14} />} onClick={handleExport}>导出</Button>
+        </Space>
+      </div>
       <Card size="small" style={{ marginBottom: 12 }}>
         <Space wrap>
           <RangePicker

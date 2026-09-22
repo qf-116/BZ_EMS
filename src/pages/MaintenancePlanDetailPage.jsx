@@ -1,5 +1,5 @@
-import React from 'react';
-import { Card, Descriptions, Table, Button, Tag, Tooltip } from 'antd';
+import React, { useState } from 'react';
+import { Card, Descriptions, Table, Button, Tag, Tooltip, Space, Modal, Form, Input, App } from 'antd';
 import { ArrowLeft } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import PageHeader from '../components/PageHeader.jsx';
@@ -30,16 +30,23 @@ const PLAN_STANDARD_MAP = {
   油压机年度保养计划: '油压机年度保养标准',
 };
 
-// 保养计划详情（范围外演示模块，只读）：/maintenance-plans/detail?code=（兼容 ?id=）。
+// 保养计划详情（范围外演示模块）：/maintenance-plans/detail?code=（兼容 ?id=）。
 // 展示计划基本信息 + 关联保养设备明细（crosswalk canonical）+ 名下关联保养任务。
+// 「编辑」为页面内演示交互（不写入 DemoStore，刷新后恢复快照）。
 export default function MaintenancePlanDetailPage() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
+  const { message } = App.useApp();
   const state = useDemoState();
   const meta = state.meta;
 
+  const [editOpen, setEditOpen] = useState(false);
+  const [form] = Form.useForm();
+  const [patch, setPatch] = useState({});
+
   const code = params.get('code') || params.get('id');
   const plan = code ? maintenancePlans.find(r => r.code === code) : null;
+  const planView = plan ? { ...plan, ...patch } : null;
 
   if (!plan) {
     return (
@@ -67,18 +74,35 @@ export default function MaintenancePlanDetailPage() {
     : [];
   const tasks = maintenanceTasks.filter(t => t.plan === plan.name);
 
+  const openEdit = () => {
+    form.resetFields();
+    form.setFieldsValue({ name: planView.name, executor: planView.executor, remark: planView.remark });
+    setEditOpen(true);
+  };
+  const handleEdit = async () => {
+    const values = await form.validateFields();
+    setPatch(prev => ({ ...prev, ...values }));
+    setEditOpen(false);
+    message.success('计划信息已保存，变更将同步到未执行的保养任务及后续按计划生成的任务');
+  };
+
   return (
     <>
       <PageHeader
         title={`保养计划详情 · ${plan.code}`}
-        subtitle={`${plan.name}`}
-        actions={<Button icon={<ArrowLeft size={14} />} onClick={() => navigate('/maintenance-plans')}>返回列表</Button>}
+        subtitle={`${planView.name}`}
+        actions={(
+          <Space>
+            <Button icon={<ArrowLeft size={14} />} onClick={() => navigate('/maintenance-plans')}>返回列表</Button>
+            <Button type="primary" onClick={openEdit}>编辑</Button>
+          </Space>
+        )}
       />
       <DegradedBanner meta={meta} />
       <Card size="small" style={{ marginBottom: 12 }}>
         <Descriptions column={3} size="small" bordered>
           <Descriptions.Item label="计划编号">{plan.code}</Descriptions.Item>
-          <Descriptions.Item label="计划名称">{dash(plan.name)}</Descriptions.Item>
+          <Descriptions.Item label="计划名称">{dash(planView.name)}</Descriptions.Item>
           <Descriptions.Item label="状态"><StatusTag value={plan.status} /></Descriptions.Item>
           <Descriptions.Item label="年度">{dash(plan.year)}</Descriptions.Item>
           <Descriptions.Item label="保养级别">{dash(plan.level)}</Descriptions.Item>
@@ -90,11 +114,11 @@ export default function MaintenancePlanDetailPage() {
           </Descriptions.Item>
           <Descriptions.Item label="关联设备">{dash(plan.devices)}</Descriptions.Item>
           <Descriptions.Item label="保养项目">{dash(plan.items)}</Descriptions.Item>
-          <Descriptions.Item label="执行人">{dash(plan.executor)}</Descriptions.Item>
+          <Descriptions.Item label="执行人">{dash(planView.executor)}</Descriptions.Item>
           <Descriptions.Item label="创建人">{dash(plan.creator)}</Descriptions.Item>
           <Descriptions.Item label="创建时间">{dash(plan.createTime)}</Descriptions.Item>
           <Descriptions.Item label="数据基准">{meta.updatedAt}</Descriptions.Item>
-          <Descriptions.Item label="备注" span={3}>{dash(plan.remark)}</Descriptions.Item>
+          <Descriptions.Item label="备注" span={3}>{dash(planView.remark)}</Descriptions.Item>
         </Descriptions>
       </Card>
 
@@ -170,6 +194,24 @@ export default function MaintenancePlanDetailPage() {
       <div style={{ textAlign: 'right' }}>
         <Button type="primary" onClick={() => navigate('/maintenance-plans')}>关闭</Button>
       </div>
+
+      <Modal
+        title={`编辑保养计划（${plan.code}）`}
+        width={640}
+        open={editOpen}
+        onCancel={() => setEditOpen(false)}
+        onOk={handleEdit}
+        okText="保存"
+        cancelText="取消"
+        destroyOnClose
+      >
+        <Form form={form} layout="vertical">
+          <Form.Item label="计划名称" name="name" rules={[{ required: true, message: '请输入计划名称' }]}><Input /></Form.Item>
+          <Form.Item label="执行人" name="executor"><Input /></Form.Item>
+          <Form.Item label="备注" name="remark"><Input.TextArea rows={2} maxLength={200} /></Form.Item>
+        </Form>
+        <div style={{ color: '#8a97a3', fontSize: 12 }}>保养周期、计划日期等口径在计划列表「编辑」中维护。</div>
+      </Modal>
     </>
   );
 }

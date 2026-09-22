@@ -19,6 +19,9 @@ export default function WorkbenchPage() {
   const meta = state.meta;
 
   const repairTodoCount = wb.pendingDispatch.length + wb.pendingAccept.length;
+  const lifecycleTodoCount = (wb.lifecycle?.pendingProcurement?.length || 0)
+    + (wb.lifecycle?.pendingTrial?.length || 0)
+    + (wb.lifecycle?.pendingRegistration?.length || 0);
 
   const goDevice = (deviceId) => navigate(`/device/${deviceId}`);
 
@@ -38,11 +41,31 @@ export default function WorkbenchPage() {
         <MetricTile label="设备总数" value={devices.length} unit="台" color="#1668dc" />
         <MetricTile label="待处理报警" value={wb.unacked.length} unit="条" color="#dc2626" />
         <MetricTile label="维修待办（派工/验收）" value={repairTodoCount} unit="单" color="#d46b08" />
+        <MetricTile label="生命周期待办" value={lifecycleTodoCount} unit="单" color="#7c3aed" />
         <MetricTile label="低库存备件" value={wb.lowStock.length} unit="项" color="#d97706" />
         <MetricTile label="接入任务异常" value={wb.ingestionIssues.length} unit="个" color="#8d6e63" />
         <MetricTile label="降级设备" value={wb.degradedDevices.length} unit="台" color="#dc2626" />
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 12 }}>
+        <Card size="small" title={<Space><CalendarCheck size={15} /> 设备入账流程</Space>} extra={<Button type="link" size="small" onClick={() => navigate('/lifecycle/tasks')}>查看全部</Button>}>
+          {lifecycleTodoCount === 0 ? (
+            renderEmpty('暂无生命周期待办', '采购入账、试用确认或设备手续入账任务会出现在此处', '新建采购入账', () => navigate('/lifecycle/tasks/procurement-entry'))
+          ) : (
+            <Table
+              rowKey="taskId" size="small" pagination={false}
+              dataSource={[...(wb.lifecycle?.pendingProcurement || []), ...(wb.lifecycle?.pendingTrial || []), ...(wb.lifecycle?.pendingRegistration || [])].slice(0, 6)}
+              columns={[
+                { title: '任务号', dataIndex: 'taskNo', width: 150 },
+                { title: '设备', dataIndex: 'equipmentName', ellipsis: true, render: v => v || '待填写' },
+                { title: '当前节点', dataIndex: 'status', width: 150, render: v => <StatusTag value={v} /> },
+                {
+                  title: '操作', width: 90,
+                  render: (_, r) => <Button type="link" size="small" onClick={() => navigate(r.status === '使用部门试用确认中' ? '/lifecycle/tasks/trial-confirmation' : r.status === '待设备手续入账' ? '/lifecycle/tasks/device-registration' : '/lifecycle/tasks')}>去处理</Button>,
+                },
+              ]}
+            />
+          )}
+        </Card>
         <Card size="small" title={<Space><AlertTriangle size={15} /> 待处理报警（已触发）</Space>} extra={<Button type="link" size="small" onClick={() => navigate('/alarm-center')}>报警中心</Button>}>
           {wb.unacked.length === 0 ? (
             renderEmpty('暂无待确认报警', '所有报警均已确认或关闭', '查看报警中心', () => navigate('/alarm-center'))

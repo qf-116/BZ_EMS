@@ -84,9 +84,6 @@ export default function PatrolItemsPage() {
       <PageHeader
         title="巡检项目"
         subtitle={`巡检项目基础档案 · 判断结果类型：${RESULT_TYPES.join('/')}（单选默认 正常/异常，数值在正常范围内为正常，文本直接填写结果）`}
-        actions={<>
-          <Button type="primary" icon={<Plus size={14} />} onClick={() => openModal(null)}>新增巡检项目</Button>
-        </>}
       />
       <DegradedBanner meta={meta} />
       <Card size="small" style={{ marginBottom: 12 }}>
@@ -100,6 +97,9 @@ export default function PatrolItemsPage() {
         </Space>
       </Card>
       <Card size="small">
+        <Space wrap style={{ marginBottom: 12 }}>
+          <Button type="primary" icon={<Plus size={14} />} onClick={() => openModal(null)}>新增巡检项目</Button>
+        </Space>
         <Table
           rowKey="code" size="small" columns={columns} dataSource={list} scroll={{ x: 1500 }}
           locale={{ emptyText: <EmptyState description="暂无巡检项目" reason={kw || status || resultType ? '当前筛选条件下没有巡检项目' : '暂无巡检项目数据'} /> }}

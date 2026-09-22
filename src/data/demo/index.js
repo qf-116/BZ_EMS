@@ -14,8 +14,9 @@ import { warehouses, spares, stock, inbounds, outbounds, returns, stockFlows } f
 import { downtimeFacts } from './downtime.js';
 import { materialPool, speedConfigs, oeeTargets, shiftCalendar, oeeInputs, oeeEligibility, oeeRecomputeLog } from './oee.js';
 import { programCompare, programBaselines, programHandles } from './programCompare.js';
+import { lifecycleTasks, assetChangeRecords, idleApplications, scrapApplications } from './lifecycle.js';
 
-export const STORE_VERSION = 4; // 快照结构版本：样本新增来源归属，不兼容时回初始快照并提示
+export const STORE_VERSION = 8; // 快照结构版本：补齐已完结生命周期任务（设备履历数据 + 入账来源关联）
 
 export const DEMO_META = {
   mode: 'demo',
@@ -76,6 +77,10 @@ export function createDemoState() {
       idempotencyByKey: {},      // 已处理动作的幂等登记（重复请求返回同一结果）
       exportTasksById: {},       // 演示导出任务
       reportsByKey: {},          // runReport 动作写入的查询口径记录
+      lifecycleTasksById: Object.fromEntries(lifecycleTasks.map(t => [t.taskId, t])),
+      assetChangeRecordsById: Object.fromEntries(assetChangeRecords.map(r => [r.changeId, r])),
+      idleApplicationsById: Object.fromEntries(idleApplications.map(r => [r.idleId, r])),
+      scrapApplicationsById: Object.fromEntries(scrapApplications.map(r => [r.scrapId, r])),
     },
     ui: {
       filtersByRoute: {},
